@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"checkout-api/handlers"
+	"checkout-api/middleware"
 	"checkout-api/store"
 
 	"github.com/jackc/pgx/v5"
@@ -38,12 +39,30 @@ func main() {
 	h := handlers.NewHandler(postgresStore)
 
 	// cart
-	http.HandleFunc("GET /user/cart", h.GetUserCart)
-	http.HandleFunc("PATCH /user/cart/items/{item_id}", h.UpsertCartItem)
-	http.HandleFunc("DELETE /user/cart/items/{item_id}", h.RemoveCartItem)
+	//http.HandleFunc("GET /user/cart", h.GetUserCart)
+	http.Handle(
+		"GET /user/cart",
+		middleware.JWTMiddleware(http.HandlerFunc(h.GetUserCart)),
+	)
+
+	//http.HandleFunc("PATCH /user/cart/items/{item_id}", h.UpsertCartItem)
+	http.Handle(
+		"PATCH /user/cart/items/{item_id}",
+		middleware.JWTMiddleware(http.HandlerFunc(h.UpsertCartItem)),
+	)
+
+	//http.HandleFunc("DELETE /user/cart/items/{item_id}", h.RemoveCartItem)
+	http.Handle(
+		"DELETE /user/cart/items/{item_id}",
+		middleware.JWTMiddleware(http.HandlerFunc(h.RemoveCartItem)),
+	)
 
 	// orders
-	http.HandleFunc("POST /orders", h.CreateOrder)
+	// http.HandleFunc("POST /orders", h.CreateOrder)
+	http.Handle(
+		"POST /orders",
+		middleware.JWTMiddleware(http.HandlerFunc(h.CreateOrder)),
+	)
 
 	// items
 	http.HandleFunc("GET /items", h.GetItems)

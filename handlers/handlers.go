@@ -9,7 +9,6 @@ import (
 	"net/mail"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -70,46 +69,47 @@ func mockProcessPayment(amount int) PaymentResult {
 }
 
 func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {
-	authorizationHeaderStr := r.Header.Get("Authorization")
-	if authorizationHeaderStr == "" {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	//authorizationHeaderStr := r.Header.Get("Authorization")
+	//if authorizationHeaderStr == "" {
+	//	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	//	return
+	//}
 
-	scheme := "bearer "
-	if len(authorizationHeaderStr) < len(scheme) {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-	userScheme := authorizationHeaderStr[:len(scheme)] // BeArER
-	if !strings.EqualFold(scheme, userScheme) {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	//scheme := "bearer "
+	//if len(authorizationHeaderStr) < len(scheme) {
+	//	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	//	return
+	//}
+	//userScheme := authorizationHeaderStr[:len(scheme)] // BeArER
+	//if !strings.EqualFold(scheme, userScheme) {
+	//	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	//	return
+	//}
 
-	userJWT := authorizationHeaderStr[len(scheme):]
-	var claims jwt.RegisteredClaims
-	_, err := jwt.ParseWithClaims(
-		userJWT,
-		&claims,
-		func(t *jwt.Token) (any, error) {
-			return []byte(SigningSecret), nil
-		},
-		jwt.WithValidMethods([]string{"HS256"}),
-	)
-	if err != nil {
-		fmt.Printf("failed to parse jwt %q", err.Error())
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	//userJWT := authorizationHeaderStr[len(scheme):]
+	//var claims jwt.RegisteredClaims
+	//_, err := jwt.ParseWithClaims(
+	//	userJWT,
+	//	&claims,
+	//	func(t *jwt.Token) (any, error) {
+	//		return []byte(SigningSecret), nil
+	//	},
+	//	jwt.WithValidMethods([]string{"HS256"}),
+	//)
+	//if err != nil {
+	//	fmt.Printf("failed to parse jwt %q", err.Error())
+	//	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	//	return
+	//}
 
-	userID, err := strconv.Atoi(claims.Subject)
-	if err != nil {
-		fmt.Printf("failed to parse jwt %q", err.Error())
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	//userID, err := strconv.Atoi(claims.Subject)
+	//if err != nil {
+	//	fmt.Printf("failed to parse jwt %q", err.Error())
+	//	http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	//	return
+	//}
 
+	userID := r.Context().Value("userID").(int) // if JWT is a middleware
 	// user is now authenticated
 	itemIDStr := r.PathValue("item_id")
 	if itemIDStr == "" {
@@ -145,17 +145,19 @@ func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) RemoveCartItem(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.Header.Get("X-User-ID")
-	if userIDStr == "" {
-		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
-		return
-	}
+	//userIDStr := r.Header.Get("X-User-ID")
+	//if userIDStr == "" {
+	//	http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+	//	return
+	//}
 
-	userID, err := strconv.Atoi(userIDStr)
-	if err != nil {
-		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
-		return
-	}
+	//userID, err := strconv.Atoi(userIDStr)
+	//if err != nil {
+	//	http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+	//	return
+	//}
+
+	userID := r.Context().Value("userID").(int) // if JWT is a middleware
 
 	itemIDStr := r.PathValue("item_id")
 	if itemIDStr == "" {
@@ -180,17 +182,19 @@ func (h *Handler) RemoveCartItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.Header.Get("X-User-ID")
-	if userIDStr == "" {
-		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
-		return
-	}
+	//userIDStr := r.Header.Get("X-User-ID")
+	//if userIDStr == "" {
+	//	http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+	//	return
+	//}
 
-	userID, err := strconv.Atoi(userIDStr)
-	if err != nil {
-		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
-		return
-	}
+	//userID, err := strconv.Atoi(userIDStr)
+	//if err != nil {
+	//	http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+	//	return
+	//}
+
+	userID := r.Context().Value("userID").(int) // if JWT is a middleware
 
 	cart, err := h.store.GetUserCart(r.Context(), userID)
 	if err != nil {
@@ -218,17 +222,19 @@ func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.Header.Get("X-User-ID")
-	if userIDStr == "" {
-		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
-		return
-	}
+	//userIDStr := r.Header.Get("X-User-ID")
+	//if userIDStr == "" {
+	//	http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+	//	return
+	//}
 
-	userID, err := strconv.Atoi(userIDStr)
-	if err != nil {
-		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
-		return
-	}
+	//userID, err := strconv.Atoi(userIDStr)
+	//if err != nil {
+	//	http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+	//	return
+	//}
+
+	userID := r.Context().Value("userID").(int) // if JWT is a middleware
 
 	idempotencyKey := r.Header.Get("Idempotency-Key")
 	if idempotencyKey == "" {
