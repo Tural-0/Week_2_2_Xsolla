@@ -14,7 +14,7 @@ import (
 
 func main() {
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgresql://postgres:postgres@localhost:5432/postgres")
+	conn, err := pgx.Connect(ctx, "postgresql://postgres:tural1234@localhost:5432/week2_2_xsolla")
 	if err != nil {
 		panic(err)
 	}

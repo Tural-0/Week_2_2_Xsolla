@@ -1,1 +1,1 @@
-TRUNCATE TABLE line_items
+TRUNCATE TABLE line_items;
