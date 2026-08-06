@@ -177,3 +177,62 @@ func (s *PostgresStore) SaveUser(ctx context.Context, email string, hash []byte)
 	_, err := s.DB().InsertUser(ctx, email, hash)
 	return err
 }
+
+/////////////////////  JWT TOKENS  ///////////////////////////
+
+func (s *PostgresStore) GetRefreshToken(ctx context.Context, token string) (int, bool, error) {
+	var userID int
+	var active bool
+
+	err := s.conn.QueryRow(
+		ctx,
+		`SELECT user_id, active
+		 FROM refresh_tokens
+		 WHERE token = $1`,
+		token,
+	).Scan(&userID, &active)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return 0, false, err
+		}
+		return 0, false, fmt.Errorf("failed to get refresh token: %w", err)
+	}
+
+	return userID, active, nil
+}
+
+func (s *PostgresStore) SaveRefreshToken(ctx context.Context, userID int, token string) error {
+
+	_, err := s.conn.Exec(
+		ctx,
+		`INSERT INTO refresh_tokens
+		(token, user_id, active)
+		VALUES ($1, $2, TRUE)`,
+		token,
+		userID,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to save refresh token: %w", err)
+	}
+
+	return nil
+}
+
+func (s *PostgresStore) DeactivateRefreshToken(ctx context.Context, token string) error {
+
+	_, err := s.conn.Exec(
+		ctx,
+		`UPDATE refresh_tokens
+		 SET active = FALSE
+		 WHERE token = $1`,
+		token,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to deactivate refresh token: %w", err)
+	}
+
+	return nil
+}

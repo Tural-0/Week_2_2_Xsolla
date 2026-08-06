@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,14 +24,21 @@ import (
 type ItemStore interface {
 	GetItems(ctx context.Context) ([]*models.Item, error)
 	GetItem(ctx context.Context, id int) (*models.Item, error)
+
 	CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string) (*models.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int, status string) error
+
 	UpsertCartItem(ctx context.Context, userID int, itemID int, quantity int) error
 	GetUserCart(ctx context.Context, userID int) ([]models.CartItem, error)
 	DeleteUserCart(ctx context.Context, userID int) error
 	RemoveCartItem(ctx context.Context, userID int, itemID int) error
+
 	SaveUser(ctx context.Context, email string, hash []byte) error
 	FindUserByEmail(ctx context.Context, email string) (models.User, error)
+
+	GetRefreshToken(ctx context.Context, token string) (int, bool, error)
+	SaveRefreshToken(ctx context.Context, userID int, token string) error
+	DeactivateRefreshToken(ctx context.Context, token string) error
 }
 
 var SigningSecret string = os.Getenv("JWT_SECRET")
@@ -389,14 +398,15 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// issue jwt
-	fifteenAfter := time.Now().Add(15 * time.Minute)
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(fifteenAfter),
-		Subject:   strconv.Itoa(user.ID),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-	})
+	//fifteenAfter := time.Now().Add(15 * time.Minute)
+	//token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+	//	ExpiresAt: jwt.NewNumericDate(fifteenAfter),
+	//	Subject:   strconv.Itoa(user.ID),
+	//	IssuedAt:  jwt.NewNumericDate(time.Now()),
+	//})
 
-	signedString, err := token.SignedString([]byte(SigningSecret))
+	//signedString, err := token.SignedString([]byte(SigningSecret))
+	signedString, err := GenerateJWT(user.ID)
 	if err != nil {
 		fmt.Printf("cannot generate signed string %q", err.Error())
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -407,10 +417,21 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	// TODO: do it yourself
 	// generate a random string(bonus: if you use a CSPRNG to generate a random sequence of bytes)
 	// insert into refresh_tokens (token_value, is_active) values ("sOmERANdomlYGeNERATEDstRing", 1)
+	refreshToken, err := GenerateRefreshToken()
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	err = h.store.SaveRefreshToken(r.Context(), user.ID, refreshToken)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
 	writeJSON(w, http.StatusOK, AuthResponse{
 		JWT:          signedString,
-		RefreshToken: "sOmERANdomlYGeNERATEDstRing",
+		RefreshToken: refreshToken,
 	})
 }
 
@@ -455,6 +476,31 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, nil)
 }
 
+/////////////////////  JWT TOKENS  ///////////////////////////
+
+func GenerateJWT(userID int) (string, error) {
+	claims := jwt.MapClaims{
+		"user_id": userID,
+		"exp":     time.Now().Add(1 * time.Minute).Unix(),
+		"iat":     time.Now().Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+}
+
+func GenerateRefreshToken() (string, error) {
+	bytes := make([]byte, 32)
+
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(bytes), nil
+}
+
 func (h *Handler) IssueJWT(w http.ResponseWriter, r *http.Request) {
 	// TODO: implement issueing of new JWT with refresh token
 	// check if refresh_token exists in the db and still active
@@ -462,5 +508,52 @@ func (h *Handler) IssueJWT(w http.ResponseWriter, r *http.Request) {
 	// generate a new random string (bonus: if you use a CSPRNG to generate a random sequence of bytes) as refresh_token
 	// save new refresh token in db
 	// deactivate old refresh token
+
+	var req RefreshRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	userID, active, err := h.store.GetRefreshToken(r.Context(), req.RefreshToken)
+	if err != nil {
+		http.Error(w, "refresh token not found", http.StatusUnauthorized)
+		return
+	}
+
+	if !active {
+		http.Error(w, "refresh token inactive", http.StatusUnauthorized)
+		return
+	}
+
+	jwtToken, err := GenerateJWT(userID)
+	if err != nil {
+		http.Error(w, "failed to generate jwt", http.StatusInternalServerError)
+		return
+	}
+
+	newRefreshToken, err := GenerateRefreshToken()
+	if err != nil {
+		http.Error(w, "failed to generate refresh token", http.StatusInternalServerError)
+		return
+	}
+
+	err = h.store.SaveRefreshToken(r.Context(), userID, newRefreshToken)
+	if err != nil {
+		http.Error(w, "failed to save refresh token", http.StatusInternalServerError)
+		return
+	}
+
+	err = h.store.DeactivateRefreshToken(r.Context(), req.RefreshToken)
+	if err != nil {
+		http.Error(w, "failed to deactivate refresh token", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"jwt":           jwtToken,
+		"refresh_token": newRefreshToken,
+	})
 
 }

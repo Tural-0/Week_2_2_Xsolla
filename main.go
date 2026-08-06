@@ -71,7 +71,7 @@ func main() {
 	// users
 	http.HandleFunc("POST /signup", h.CreateUser)
 	http.HandleFunc("POST /login", h.LoginUser)
-	http.HandleFunc("GET /token", h.IssueJWT)
+	http.HandleFunc("POST /token", h.IssueJWT)
 
 	fmt.Println("Server starting on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

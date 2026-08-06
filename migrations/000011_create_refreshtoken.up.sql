@@ -1,0 +1,10 @@
+BEGIN;
+
+CREATE TABLE refresh_tokens (
+    token VARCHAR(255) PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+COMMIT;
