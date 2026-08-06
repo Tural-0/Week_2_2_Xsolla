@@ -5,16 +5,24 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"checkout-api/handlers"
 	"checkout-api/store"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	connString := os.Getenv("CON_STRING")
+
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgresql://postgres:tural1234@localhost:5432/week2_2_xsolla")
+	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		panic(err)
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/mail"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -32,7 +33,7 @@ type ItemStore interface {
 	FindUserByEmail(ctx context.Context, email string) (models.User, error)
 }
 
-var SigningSecret string = "5298365169"
+var SigningSecret string = os.Getenv("JWT_SECRET")
 
 // Handler holds dependencies for HTTP handlers.
 type Handler struct {
