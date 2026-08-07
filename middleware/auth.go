@@ -30,13 +30,14 @@ func JWTMiddleware(next http.Handler) http.Handler {
 
 		_, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok { // signature check
 				return nil, jwt.ErrTokenSignatureInvalid
 			}
 
-			claims := token.Claims.(jwt.MapClaims)
+			claims := token.Claims.(jwt.MapClaims) // userId, exp, iat
 
 			ctx = context.WithValue(r.Context(), "userID", int(claims["user_id"].(float64)))
+			// converts to int for later use
 
 			return []byte(os.Getenv("JWT_SECRET")), nil
 		})

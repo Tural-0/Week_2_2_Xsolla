@@ -481,7 +481,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 func GenerateJWT(userID int) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,
-		"exp":     time.Now().Add(1 * time.Minute).Unix(),
+		"exp":     time.Now().Add(15 * time.Minute).Unix(),
 		"iat":     time.Now().Unix(),
 	}
 
@@ -491,14 +491,14 @@ func GenerateJWT(userID int) (string, error) {
 }
 
 func GenerateRefreshToken() (string, error) {
-	bytes := make([]byte, 32)
+	bytes := make([]byte, 32) // 32 byte for 256 bits, means 2^256 possible
 
-	_, err := rand.Read(bytes)
+	_, err := rand.Read(bytes) // CSPRNG
 	if err != nil {
 		return "", err
 	}
 
-	return hex.EncodeToString(bytes), nil
+	return hex.EncodeToString(bytes), nil // convert to hex
 }
 
 func (h *Handler) IssueJWT(w http.ResponseWriter, r *http.Request) {

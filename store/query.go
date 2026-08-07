@@ -48,7 +48,7 @@ func (q *Query) UpdateOrderStatus(ctx context.Context, orderID int, status strin
 }
 
 func (q *Query) InsertLineItem(ctx context.Context, orderID int, itemID int, price int, quantity int) (pgconn.CommandTag, error) {
-	return q.DBTX.Exec(ctx, "insert into line_items (order_id, item_id, price, quantity) values ($1, $2, $3, $4)", orderID, itemID, price, quantity)
+	return q.DBTX.Exec(ctx, "insert into order_items (order_id, item_id, price, quantity) values ($1, $2, $3, $4)", orderID, itemID, price, quantity)
 }
 
 func (q *Query) DecrementItemStock(ctx context.Context, itemID int, quantity int) (pgconn.CommandTag, error) {
