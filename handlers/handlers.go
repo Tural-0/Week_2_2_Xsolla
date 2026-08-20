@@ -28,6 +28,7 @@ type ItemStore interface {
 	CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string) (*models.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int, status string) error
 
+	CreateUserCart(ctx context.Context, cart *models.Cart) error
 	UpsertCartItem(ctx context.Context, userID int, itemID int, quantity int) error
 	GetUserCart(ctx context.Context, userID int) ([]models.CartItem, error)
 	DeleteUserCart(ctx context.Context, userID int) error
@@ -75,6 +76,62 @@ func mockProcessPayment(amount int) PaymentResult {
 		Success: false,
 		Error:   "Payment declined",
 	}
+}
+
+func (h *Handler) CreateUserCart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var cartReq CreateCartRequest
+
+	err := json.NewDecoder(r.Body).Decode(&cartReq)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	userID := r.Context().Value("userID").(int) // if JWT is a middleware
+
+	items, err := h.store.GetUserCart(r.Context(), userID)
+	if len(items) != 0 {
+		http.Error(w, "cart already exists", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if cartReq.Quantity <= 0 {
+		http.Error(w, "quantity must be greater than 0", http.StatusBadRequest)
+		return
+	}
+
+	item, err := h.store.GetItem(r.Context(), cartReq.ItemID)
+	if err != nil || item == nil {
+		http.Error(w, "item with that Id doesn't exist", http.StatusBadRequest)
+		return
+	}
+
+	if cartReq.Quantity > item.Stock {
+		http.Error(w, "quantity is greater than stock", http.StatusBadRequest)
+		return
+	}
+
+	cart := models.Cart{
+		UserID:   userID,
+		ItemID:   cartReq.ItemID,
+		Quantity: cartReq.Quantity,
+	}
+	err = h.store.CreateUserCart(r.Context(), &cart)
+	if err != nil {
+		http.Error(w, "Failed to create cart", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, cart)
 }
 
 func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {

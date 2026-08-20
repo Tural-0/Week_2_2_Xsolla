@@ -51,7 +51,7 @@ func (s *PostgresStore) GetItems(ctx context.Context) ([]*models.Item, error) {
 		items = append(items, &item)
 	}
 	if rows.Err() != nil {
-		return nil, err
+		return nil, rows.Err()
 	}
 
 	return items, nil
@@ -123,6 +123,16 @@ func (s *PostgresStore) CreateOrder(ctx context.Context, userID int, items []mod
 func (s *PostgresStore) UpdateOrderStatus(ctx context.Context, orderID int, status string) error {
 	_, err := s.DB().UpdateOrderStatus(ctx, orderID, status)
 	return err
+}
+
+func (s *PostgresStore) CreateUserCart(ctx context.Context, cart *models.Cart) error {
+	_, err := s.conn.Exec(ctx,
+		"INSERT INTO carts (user_id, item_id, quantity) VALUES ($1, $2, $3)", cart.UserID, cart.ItemID, cart.Quantity)
+	if err != nil {
+		return fmt.Errorf("%w: failed to run query on CreateUserCart while INSERT", err)
+	}
+
+	return nil
 }
 
 func (s *PostgresStore) UpsertCartItem(ctx context.Context, userID int, itemID int, quantity int) error {

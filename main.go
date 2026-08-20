@@ -39,6 +39,11 @@ func main() {
 	h := handlers.NewHandler(postgresStore)
 
 	// cart
+	http.Handle(
+		"POST /user/carts",
+		middleware.JWTMiddleware(http.HandlerFunc(h.CreateUserCart)),
+	)
+
 	//http.HandleFunc("GET /user/cart", h.GetUserCart)
 	http.Handle(
 		"GET /user/cart",
@@ -71,7 +76,7 @@ func main() {
 	// users
 	http.HandleFunc("POST /signup", h.CreateUser)
 	http.HandleFunc("POST /login", h.LoginUser)
-	http.HandleFunc("POST /token", h.IssueJWT)
+	http.HandleFunc("GET /token", h.IssueJWT)
 
 	fmt.Println("Server starting on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

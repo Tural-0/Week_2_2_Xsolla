@@ -23,3 +23,8 @@ type AuthRequest struct {
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
+
+type CreateCartRequest struct {
+	ItemID   int `json:"item_id"`
+	Quantity int `json:"quantity"`
+}
