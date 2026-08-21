@@ -11,8 +11,9 @@ import (
 	"checkout-api/middleware"
 	"checkout-api/store"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	"github.com/rs/cors"
 )
 
 func main() {
@@ -23,61 +24,75 @@ func main() {
 	connString := os.Getenv("CON_STRING")
 
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, connString)
+
+	////////////////////////////////////////////////////
+
+	pool, err := pgxpool.New(ctx, connString)
 	if err != nil {
+		panic(err)
+	}
+	defer pool.Close()
+
+	if err := pool.Ping(ctx); err != nil {
 		panic(err)
 	}
 
-	err = conn.Ping(ctx)
-	if err != nil {
-		panic(err)
-	}
 	fmt.Println("successfully connected to db")
 
+	////////////////////////////////////////////////////
+
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Authorization", "Content-Type", "X-User-ID", "Idempotency-Key"},
+	})
+
 	// s := store.NewInMemStore()
-	postgresStore := store.NewPostgresStore(conn)
+	postgresStore := store.NewPostgresStore(pool)
 	h := handlers.NewHandler(postgresStore)
+	mux := http.NewServeMux()
 
 	// cart
-	http.Handle(
+	mux.Handle(
 		"POST /user/carts",
 		middleware.JWTMiddleware(http.HandlerFunc(h.CreateUserCart)),
 	)
 
 	//http.HandleFunc("GET /user/cart", h.GetUserCart)
-	http.Handle(
+	mux.Handle(
 		"GET /user/cart",
 		middleware.JWTMiddleware(http.HandlerFunc(h.GetUserCart)),
 	)
 
 	//http.HandleFunc("PATCH /user/cart/items/{item_id}", h.UpsertCartItem)
-	http.Handle(
+	mux.Handle(
 		"PATCH /user/cart/items/{item_id}",
 		middleware.JWTMiddleware(http.HandlerFunc(h.UpsertCartItem)),
 	)
 
 	//http.HandleFunc("DELETE /user/cart/items/{item_id}", h.RemoveCartItem)
-	http.Handle(
+	mux.Handle(
 		"DELETE /user/cart/items/{item_id}",
 		middleware.JWTMiddleware(http.HandlerFunc(h.RemoveCartItem)),
 	)
 
 	// orders
 	// http.HandleFunc("POST /orders", h.CreateOrder)
-	http.Handle(
+	mux.Handle(
 		"POST /orders",
 		middleware.JWTMiddleware(http.HandlerFunc(h.CreateOrder)),
 	)
 
 	// items
-	http.HandleFunc("GET /items", h.GetItems)
-	http.HandleFunc("GET /items/{item_id}", h.GetItemByID)
+	mux.HandleFunc("GET /items", h.GetItems)
+	mux.HandleFunc("GET /items/{item_id}", h.GetItemByID)
 
 	// users
-	http.HandleFunc("POST /signup", h.CreateUser)
-	http.HandleFunc("POST /login", h.LoginUser)
-	http.HandleFunc("GET /token", h.IssueJWT)
+	mux.HandleFunc("POST /signup", h.CreateUser)
+	mux.HandleFunc("POST /login", h.LoginUser)
+	mux.HandleFunc("GET /token", h.IssueJWT)
 
 	fmt.Println("Server starting on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	handler := c.Handler(mux)
+	log.Fatal(http.ListenAndServe(":8080", handler))
 }

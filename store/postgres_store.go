@@ -7,24 +7,25 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // PostgresStore is an in-memory store for items and orders.
 type PostgresStore struct {
-	conn *pgx.Conn
+	pool *pgxpool.Pool
 }
 
 // NewPostgresStore creates a Store pre-loaded with seed data.
-func NewPostgresStore(conn *pgx.Conn) *PostgresStore {
+func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 	s := &PostgresStore{
-		conn: conn,
+		pool: pool,
 	}
 	return s
 }
 
 func (s *PostgresStore) DB() *Query {
 	return &Query{
-		DBTX: s.conn,
+		DBTX: s.pool,
 	}
 }
 
@@ -70,7 +71,7 @@ func (s *PostgresStore) GetItem(ctx context.Context, id int) (*models.Item, erro
 }
 
 func (s *PostgresStore) CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string) (*models.Order, error) {
-	tx, err := s.conn.Begin(ctx)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -126,7 +127,7 @@ func (s *PostgresStore) UpdateOrderStatus(ctx context.Context, orderID int, stat
 }
 
 func (s *PostgresStore) CreateUserCart(ctx context.Context, cart *models.Cart) error {
-	_, err := s.conn.Exec(ctx,
+	_, err := s.pool.Exec(ctx,
 		"INSERT INTO carts (user_id, item_id, quantity) VALUES ($1, $2, $3)", cart.UserID, cart.ItemID, cart.Quantity)
 	if err != nil {
 		return fmt.Errorf("%w: failed to run query on CreateUserCart while INSERT", err)
@@ -194,7 +195,7 @@ func (s *PostgresStore) GetRefreshToken(ctx context.Context, token string) (int,
 	var userID int
 	var active bool
 
-	err := s.conn.QueryRow(
+	err := s.pool.QueryRow(
 		ctx,
 		`SELECT user_id, active
 		 FROM refresh_tokens
@@ -214,7 +215,7 @@ func (s *PostgresStore) GetRefreshToken(ctx context.Context, token string) (int,
 
 func (s *PostgresStore) SaveRefreshToken(ctx context.Context, userID int, token string) error {
 
-	_, err := s.conn.Exec(
+	_, err := s.pool.Exec(
 		ctx,
 		`INSERT INTO refresh_tokens
 		(token, user_id, active)
@@ -232,7 +233,7 @@ func (s *PostgresStore) SaveRefreshToken(ctx context.Context, userID int, token 
 
 func (s *PostgresStore) DeactivateRefreshToken(ctx context.Context, token string) error {
 
-	_, err := s.conn.Exec(
+	_, err := s.pool.Exec(
 		ctx,
 		`UPDATE refresh_tokens
 		 SET active = FALSE
