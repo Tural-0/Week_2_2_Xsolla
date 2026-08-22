@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"checkout-api/handlers"
-	"checkout-api/middleware"
 	"checkout-api/store"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -53,39 +52,41 @@ func main() {
 	mux := http.NewServeMux()
 
 	// cart
-	mux.Handle(
-		"POST /user/carts",
-		middleware.JWTMiddleware(http.HandlerFunc(h.CreateUserCart)),
-	)
+	mux.HandleFunc("POST /user/carts", h.CreateUserCart)
+	//mux.Handle(
+	//	"POST /user/carts",
+	//	middleware.JWTMiddleware(http.HandlerFunc(h.CreateUserCart)),
+	//)
 
-	//http.HandleFunc("GET /user/cart", h.GetUserCart)
-	mux.Handle(
-		"GET /user/cart",
-		middleware.JWTMiddleware(http.HandlerFunc(h.GetUserCart)),
-	)
+	mux.HandleFunc("GET /user/cart", h.GetUserCart)
+	//mux.Handle(
+	//	"GET /user/cart",
+	//	middleware.JWTMiddleware(http.HandlerFunc(h.GetUserCart)),
+	//)
 
-	//http.HandleFunc("PATCH /user/cart/items/{item_id}", h.UpsertCartItem)
-	mux.Handle(
-		"PATCH /user/cart/items/{item_id}",
-		middleware.JWTMiddleware(http.HandlerFunc(h.UpsertCartItem)),
-	)
+	mux.HandleFunc("PATCH /user/cart/items/{item_id}", h.UpsertCartItem)
+	//mux.Handle(
+	//	"PATCH /user/cart/items/{item_id}",
+	//	middleware.JWTMiddleware(http.HandlerFunc(h.UpsertCartItem)),
+	//)
 
-	//http.HandleFunc("DELETE /user/cart/items/{item_id}", h.RemoveCartItem)
-	mux.Handle(
-		"DELETE /user/cart/items/{item_id}",
-		middleware.JWTMiddleware(http.HandlerFunc(h.RemoveCartItem)),
-	)
+	mux.HandleFunc("DELETE /user/cart/items/{item_id}", h.RemoveCartItem)
+	//mux.Handle(
+	//	"DELETE /user/cart/items/{item_id}",
+	//	middleware.JWTMiddleware(http.HandlerFunc(h.RemoveCartItem)),
+	//)
 
 	// orders
-	// http.HandleFunc("POST /orders", h.CreateOrder)
-	mux.Handle(
-		"POST /orders",
-		middleware.JWTMiddleware(http.HandlerFunc(h.CreateOrder)),
-	)
+	mux.HandleFunc("POST /orders", h.CreateOrder)
+	//mux.Handle(
+	//	"POST /orders",
+	//	middleware.JWTMiddleware(http.HandlerFunc(h.CreateOrder)),
+	//)
 
 	// items
 	mux.HandleFunc("GET /items", h.GetItems)
 	mux.HandleFunc("GET /items/{item_id}", h.GetItemByID)
+	mux.HandleFunc("GET /itemQuantity/{item_id}", h.GetItemQuantityById) // auth for this
 
 	// users
 	mux.HandleFunc("POST /signup", h.CreateUser)

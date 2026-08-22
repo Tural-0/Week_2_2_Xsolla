@@ -247,3 +247,24 @@ func (s *PostgresStore) DeactivateRefreshToken(ctx context.Context, token string
 
 	return nil
 }
+
+func (s *PostgresStore) GetItemQuantityById(ctx context.Context, userId int, itemId int) (int, error) {
+	var quantity int
+
+	err := s.pool.QueryRow(
+		ctx,
+		`SELECT quantity
+		 FROM carts
+		 WHERE user_id = $1 AND item_id = $2`,
+		userId, itemId,
+	).Scan(&quantity)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("failed to get item quantity: %w", err)
+	}
+
+	return quantity, nil
+}

@@ -24,6 +24,7 @@ import (
 type ItemStore interface {
 	GetItems(ctx context.Context) ([]*models.Item, error)
 	GetItem(ctx context.Context, id int) (*models.Item, error)
+	GetItemQuantityById(ctx context.Context, userId int, itemId int) (int, error)
 
 	CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string) (*models.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int, status string) error
@@ -92,7 +93,21 @@ func (h *Handler) CreateUserCart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := r.Context().Value("userID").(int) // if JWT is a middleware
+	///////////////////
+	userIDStr := r.Header.Get("X-User-ID")
+	if userIDStr == "" {
+		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		return
+	}
+	///////////////////
+
+	//userID := r.Context().Value("userID").(int) // if JWT is a middleware
 
 	items, err := h.store.GetUserCart(r.Context(), userID)
 	if len(items) != 0 {
@@ -135,48 +150,21 @@ func (h *Handler) CreateUserCart(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {
-	//authorizationHeaderStr := r.Header.Get("Authorization")
-	//if authorizationHeaderStr == "" {
-	//	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-	//	return
-	//}
 
-	//scheme := "bearer "
-	//if len(authorizationHeaderStr) < len(scheme) {
-	//	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-	//	return
-	//}
-	//userScheme := authorizationHeaderStr[:len(scheme)] // BeArER
-	//if !strings.EqualFold(scheme, userScheme) {
-	//	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-	//	return
-	//}
+	userIDStr := r.Header.Get("X-User-ID")
+	if userIDStr == "" {
+		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		return
+	}
 
-	//userJWT := authorizationHeaderStr[len(scheme):]
-	//var claims jwt.RegisteredClaims
-	//_, err := jwt.ParseWithClaims(
-	//	userJWT,
-	//	&claims,
-	//	func(t *jwt.Token) (any, error) {
-	//		return []byte(SigningSecret), nil
-	//	},
-	//	jwt.WithValidMethods([]string{"HS256"}),
-	//)
-	//if err != nil {
-	//	fmt.Printf("failed to parse jwt %q", err.Error())
-	//	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-	//	return
-	//}
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		return
+	}
 
-	//userID, err := strconv.Atoi(claims.Subject)
-	//if err != nil {
-	//	fmt.Printf("failed to parse jwt %q", err.Error())
-	//	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-	//	return
-	//}
+	//userID := r.Context().Value("userID").(int) // if JWT is a middleware
 
-	userID := r.Context().Value("userID").(int) // if JWT is a middleware
-	// user is now authenticated
 	itemIDStr := r.PathValue("item_id")
 	if itemIDStr == "" {
 		http.Error(w, "missing item_id", http.StatusBadRequest)
@@ -211,19 +199,19 @@ func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) RemoveCartItem(w http.ResponseWriter, r *http.Request) {
-	//userIDStr := r.Header.Get("X-User-ID")
-	//if userIDStr == "" {
-	//	http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
-	//	return
-	//}
+	userIDStr := r.Header.Get("X-User-ID")
+	if userIDStr == "" {
+		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		return
+	}
 
-	//userID, err := strconv.Atoi(userIDStr)
-	//if err != nil {
-	//	http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
-	//	return
-	//}
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		return
+	}
 
-	userID := r.Context().Value("userID").(int) // if JWT is a middleware
+	//userID := r.Context().Value("userID").(int) // if JWT is a middleware
 
 	itemIDStr := r.PathValue("item_id")
 	if itemIDStr == "" {
@@ -248,19 +236,19 @@ func (h *Handler) RemoveCartItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
-	//userIDStr := r.Header.Get("X-User-ID")
-	//if userIDStr == "" {
-	//	http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
-	//	return
-	//}
+	userIDStr := r.Header.Get("X-User-ID")
+	if userIDStr == "" {
+		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		return
+	}
 
-	//userID, err := strconv.Atoi(userIDStr)
-	//if err != nil {
-	//	http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
-	//	return
-	//}
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		return
+	}
 
-	userID := r.Context().Value("userID").(int) // if JWT is a middleware
+	//userID := r.Context().Value("userID").(int) // if JWT is a middleware
 
 	cart, err := h.store.GetUserCart(r.Context(), userID)
 	if err != nil {
@@ -288,19 +276,19 @@ func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
-	//userIDStr := r.Header.Get("X-User-ID")
-	//if userIDStr == "" {
-	//	http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
-	//	return
-	//}
+	userIDStr := r.Header.Get("X-User-ID")
+	if userIDStr == "" {
+		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		return
+	}
 
-	//userID, err := strconv.Atoi(userIDStr)
-	//if err != nil {
-	//	http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
-	//	return
-	//}
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		return
+	}
 
-	userID := r.Context().Value("userID").(int) // if JWT is a middleware
+	//userID := r.Context().Value("userID").(int) // if JWT is a middleware
 
 	idempotencyKey := r.Header.Get("Idempotency-Key")
 	if idempotencyKey == "" {
@@ -613,4 +601,48 @@ func (h *Handler) IssueJWT(w http.ResponseWriter, r *http.Request) {
 		"refresh_token": newRefreshToken,
 	})
 
+}
+
+////////////////////////////////////////////////////////////////
+
+func (h *Handler) GetItemQuantityById(w http.ResponseWriter, r *http.Request) {
+	userIDStr := r.Header.Get("X-User-ID")
+	if userIDStr == "" {
+		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		return
+	}
+
+	itemIDStr := r.PathValue("item_id")
+	if itemIDStr == "" {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	itemID, err := strconv.Atoi(itemIDStr)
+	if err != nil {
+		writeJSON(w, http.StatusUnprocessableEntity, ErrorMessageResponse{
+			Message: "item_id must be an integer",
+		})
+		return
+	}
+
+	quantity, err := h.store.GetItemQuantityById(r.Context(), userID, itemID)
+	if quantity <= 0 {
+		writeJSON(w, http.StatusOK, quantity)
+		return
+	}
+
+	if err != nil {
+		fmt.Printf("error: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, quantity)
 }
