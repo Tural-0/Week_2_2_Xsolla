@@ -76,6 +76,8 @@ func main() {
 	//	middleware.JWTMiddleware(http.HandlerFunc(h.RemoveCartItem)),
 	//)
 
+	mux.HandleFunc("DELETE /user/cart", h.DeleteUserCart)
+
 	// orders
 	mux.HandleFunc("POST /orders", h.CreateOrder)
 	//mux.Handle(

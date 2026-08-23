@@ -275,6 +275,30 @@ func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) DeleteUserCart(w http.ResponseWriter, r *http.Request) {
+	userIDStr := r.Header.Get("X-User-ID")
+	if userIDStr == "" {
+		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		return
+	}
+
+	//userID := r.Context().Value("userID").(int) // if JWT is a middleware
+
+	err = h.store.DeleteUserCart(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
