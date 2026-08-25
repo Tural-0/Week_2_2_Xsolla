@@ -89,7 +89,7 @@ func main() {
 	// items
 	mux.HandleFunc("GET /items", h.GetItems)
 	mux.HandleFunc("GET /items/{item_id}", h.GetItemByID)
-	mux.HandleFunc("GET /itemQuantity/{item_id}", h.GetItemQuantityById) // auth for this
+	mux.HandleFunc("GET /itemQuantity/{item_id}", h.GetItemQuantityByID) // auth for this
 
 	// users
 	mux.HandleFunc("POST /signup", h.CreateUser)
