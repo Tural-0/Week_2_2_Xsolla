@@ -127,7 +127,7 @@ func (h *Handler) CreateUserCart(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.store.GetItem(r.Context(), cartReq.ItemID)
 	if err != nil || item == nil {
-		http.Error(w, "item with that ID doesn't exist", http.StatusBadRequest)
+		http.Error(w, "item with that ID doesn't exist", http.StatusNotFound)
 		return
 	}
 
@@ -253,7 +253,7 @@ func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
 
 	cart, err := h.store.GetUserCart(r.Context(), userID)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -293,7 +293,7 @@ func (h *Handler) DeleteUserCart(w http.ResponseWriter, r *http.Request) {
 
 	err = h.store.DeleteUserCart(r.Context(), userID)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -396,7 +396,7 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
 	items, err := h.store.GetItems(r.Context())
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -407,7 +407,7 @@ func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	itemIDStr := r.PathValue("item_id")
 	if itemIDStr == "" {
-		http.Error(w, "Not Found", http.StatusNotFound)
+		http.Error(w, "URL doesn't contain item ID", http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -422,7 +422,7 @@ func (h *Handler) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	item, err := h.store.GetItem(r.Context(), itemID)
 	if err != nil {
 		fmt.Printf("error: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -452,13 +452,13 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	user, err := h.store.FindUserByEmail(r.Context(), req.Email)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeJSON(w, http.StatusUnprocessableEntity, ErrorMessageResponse{
+			writeJSON(w, http.StatusNotFound, ErrorMessageResponse{
 				Message: "user does not exist",
 			})
 			return
 		}
 		fmt.Printf("cannot query %q", err.Error())
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -479,7 +479,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	signedString, err := GenerateJWT(user.ID)
 	if err != nil {
 		fmt.Printf("cannot generate signed string %q", err.Error())
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -489,13 +489,13 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	// insert into refresh_tokens (token_value, is_active) values ("sOmERANdomlYGeNERATEDstRing", 1)
 	refreshToken, err := GenerateRefreshToken()
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	err = h.store.SaveRefreshToken(r.Context(), user.ID, refreshToken)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -533,13 +533,13 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	err = h.store.SaveUser(r.Context(), req.Email, hash)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -645,7 +645,7 @@ func (h *Handler) GetItemQuantityByID(w http.ResponseWriter, r *http.Request) {
 
 	itemIDStr := r.PathValue("item_id")
 	if itemIDStr == "" {
-		http.Error(w, "Not Found", http.StatusNotFound)
+		http.Error(w, "Not Found", http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -665,7 +665,7 @@ func (h *Handler) GetItemQuantityByID(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		fmt.Printf("error: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
