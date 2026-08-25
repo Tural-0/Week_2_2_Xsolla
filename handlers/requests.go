@@ -1,7 +1,7 @@
 package handlers
 
 type UpsertCartItemRequest struct {
-	Quantity int `json:"quantity"`
+	Quantity *int `json:"quantity"`
 }
 
 type CreateOrderRequest struct {

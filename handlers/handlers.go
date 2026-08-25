@@ -18,6 +18,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"checkout-api/models"
+	"checkout-api/validation"
 )
 
 // ItemStore defines the data operations the handler needs.
@@ -180,18 +181,42 @@ func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := validation.ItemID(itemID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	item, err := h.store.GetItem(r.Context(), itemID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, ErrorMessageResponse{
+			Message: "No product exists with this item_id",
+		})
+		return
+	}
+
 	var req UpsertCartItemRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if req.Quantity <= 0 {
-		http.Error(w, "quantity must be greater than 0", http.StatusBadRequest)
+	if err := validation.QuantityProvided(req.Quantity); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := h.store.UpsertCartItem(r.Context(), userID, itemID, req.Quantity); err != nil {
+	quantity := *req.Quantity
+
+	if err := validation.QuantityIsPositive(quantity); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	if err := validation.QuantityWithinStock(quantity, item.Stock); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
+	if err := h.store.UpsertCartItem(r.Context(), userID, itemID, quantity); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
