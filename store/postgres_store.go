@@ -58,9 +58,9 @@ func (s *PostgresStore) GetItems(ctx context.Context) ([]*models.Item, error) {
 	return items, nil
 }
 
-func (s *PostgresStore) GetItem(ctx context.Context, id int) (*models.Item, error) {
+func (s *PostgresStore) GetItem(ctx context.Context, ID int) (*models.Item, error) {
 	var item models.Item
-	err := s.DB().GetItemByID(ctx, id).Scan(&item.ID, &item.Name, &item.Description, &item.Price, &item.Stock, &item.CreatedAt)
+	err := s.DB().GetItemByID(ctx, ID).Scan(&item.ID, &item.Name, &item.Description, &item.Price, &item.Stock, &item.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -248,7 +248,7 @@ func (s *PostgresStore) DeactivateRefreshToken(ctx context.Context, token string
 	return nil
 }
 
-func (s *PostgresStore) GetItemQuantityById(ctx context.Context, userId int, itemId int) (int, error) {
+func (s *PostgresStore) GetItemQuantityByID(ctx context.Context, userID int, itemID int) (int, error) {
 	var quantity int
 
 	err := s.pool.QueryRow(
@@ -256,7 +256,7 @@ func (s *PostgresStore) GetItemQuantityById(ctx context.Context, userId int, ite
 		`SELECT quantity
 		 FROM carts
 		 WHERE user_id = $1 AND item_id = $2`,
-		userId, itemId,
+		userID, itemID,
 	).Scan(&quantity)
 
 	if err != nil {
@@ -271,18 +271,18 @@ func (s *PostgresStore) GetItemQuantityById(ctx context.Context, userId int, ite
 
 ///////////////////////
 
-func (s *PostgresStore) GetOrderById(ctx context.Context, orderId int) ([]models.CartItem, error) {
+func (s *PostgresStore) GetOrderByID(ctx context.Context, orderID int) ([]models.CartItem, error) {
 	rows, err := s.pool.Query(
 		ctx,
 		`select i.id, i.name, i.description, i.price, i.stock, i.created_at, oi.quantity
 		from order_items oi
 		inner join items i on i.id = oi.item_id
 		where oi.order_id = $1`,
-		orderId,
+		orderID,
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get order with id %d: %w", orderId, err)
+		return nil, fmt.Errorf("failed to get order with ID %d: %w", orderID, err)
 	}
 
 	defer rows.Close()
@@ -303,18 +303,18 @@ func (s *PostgresStore) GetOrderById(ctx context.Context, orderId int) ([]models
 
 }
 
-func (s *PostgresStore) GetOrderLineItemById(ctx context.Context, orderId int) ([]models.LineItem, error) {
+func (s *PostgresStore) GetOrderLineItemByID(ctx context.Context, orderID int) ([]models.LineItem, error) {
 	rows, err := s.pool.Query(
 		ctx,
 		`select i.id, oi.quantity, i.price
 		from order_items oi
 		inner join items i on i.id = oi.item_id
 		where oi.order_id = $1`,
-		orderId,
+		orderID,
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get order with id %d: %w", orderId, err)
+		return nil, fmt.Errorf("failed to get order with ID %d: %w", orderID, err)
 	}
 
 	defer rows.Close()
@@ -335,7 +335,7 @@ func (s *PostgresStore) GetOrderLineItemById(ctx context.Context, orderId int) (
 
 }
 
-func (s *PostgresStore) GetUserOrders(ctx context.Context, userId int) ([]models.Order, error) {
+func (s *PostgresStore) GetUserOrders(ctx context.Context, userID int) ([]models.Order, error) {
 	var total int
 	var status string
 
@@ -344,27 +344,27 @@ func (s *PostgresStore) GetUserOrders(ctx context.Context, userId int) ([]models
 		`SELECT id
 		FROM orders
 		WHERE user_id = $1`,
-		userId,
+		userID,
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to find order ids: %w", err)
+		return nil, fmt.Errorf("failed to find order IDs: %w", err)
 	}
 
 	defer rows.Close()
 
-	var orderIds = make([]int, 0)
+	var orderIDs = make([]int, 0)
 	for rows.Next() {
-		var id int
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("failed to scan order ids: %w", err)
+		var ID int
+		if err := rows.Scan(&ID); err != nil {
+			return nil, fmt.Errorf("failed to scan order IDs: %w", err)
 		}
-		orderIds = append(orderIds, id)
+		orderIDs = append(orderIDs, ID)
 	}
 
 	var orders = make([]models.Order, 0)
-	for _, orderId := range orderIds {
-		items, err := s.GetOrderLineItemById(ctx, orderId)
+	for _, orderID := range orderIDs {
+		items, err := s.GetOrderLineItemByID(ctx, orderID)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan order items: %w", err)
@@ -375,12 +375,12 @@ func (s *PostgresStore) GetUserOrders(ctx context.Context, userId int) ([]models
 			`SELECT total, status
 			FROM orders
 			WHERE user_id = $1 AND id = $2`,
-			userId, orderId,
+			userID, orderID,
 		).Scan(&total, &status)
 
 		var order = models.Order{
-			ID:     orderId,
-			UserID: userId,
+			ID:     orderID,
+			UserID: userID,
 			Items:  items,
 			Total:  total,
 			Status: status,

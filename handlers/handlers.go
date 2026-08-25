@@ -23,12 +23,12 @@ import (
 // ItemStore defines the data operations the handler needs.
 type ItemStore interface {
 	GetItems(ctx context.Context) ([]*models.Item, error)
-	GetItem(ctx context.Context, id int) (*models.Item, error)
-	GetItemQuantityById(ctx context.Context, userId int, itemId int) (int, error)
+	GetItem(ctx context.Context, ID int) (*models.Item, error)
+	GetItemQuantityByID(ctx context.Context, userID int, itemID int) (int, error)
 
 	CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string) (*models.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int, status string) error
-	GetUserOrders(ctx context.Context, userId int) ([]models.Order, error)
+	GetUserOrders(ctx context.Context, userID int) ([]models.Order, error)
 
 	CreateUserCart(ctx context.Context, cart *models.Cart) error
 	UpsertCartItem(ctx context.Context, userID int, itemID int, quantity int) error
@@ -127,7 +127,7 @@ func (h *Handler) CreateUserCart(w http.ResponseWriter, r *http.Request) {
 
 	item, err := h.store.GetItem(r.Context(), cartReq.ItemID)
 	if err != nil || item == nil {
-		http.Error(w, "item with that Id doesn't exist", http.StatusBadRequest)
+		http.Error(w, "item with that ID doesn't exist", http.StatusBadRequest)
 		return
 	}
 
@@ -630,7 +630,7 @@ func (h *Handler) IssueJWT(w http.ResponseWriter, r *http.Request) {
 
 ////////////////////////////////////////////////////////////////
 
-func (h *Handler) GetItemQuantityById(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetItemQuantityByID(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
 		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
@@ -657,7 +657,7 @@ func (h *Handler) GetItemQuantityById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	quantity, err := h.store.GetItemQuantityById(r.Context(), userID, itemID)
+	quantity, err := h.store.GetItemQuantityByID(r.Context(), userID, itemID)
 	if quantity <= 0 {
 		writeJSON(w, http.StatusOK, quantity)
 		return
@@ -699,7 +699,7 @@ func (h *Handler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 	for _, order := range orders {
 		items := make([]LinteItemResponse, 0, len(order.Items))
 
-		for _, item := range items {
+		for _, item := range order.Items {
 			items = append(items, LinteItemResponse{
 				ItemID:   item.ItemID,
 				Quantity: item.Quantity,
