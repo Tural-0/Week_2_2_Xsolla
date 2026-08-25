@@ -84,6 +84,7 @@ func main() {
 	//	"POST /orders",
 	//	middleware.JWTMiddleware(http.HandlerFunc(h.CreateOrder)),
 	//)
+	mux.HandleFunc("GET /user/orders", h.GetUserOrders)
 
 	// items
 	mux.HandleFunc("GET /items", h.GetItems)

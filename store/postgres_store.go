@@ -268,3 +268,126 @@ func (s *PostgresStore) GetItemQuantityById(ctx context.Context, userId int, ite
 
 	return quantity, nil
 }
+
+///////////////////////
+
+func (s *PostgresStore) GetOrderById(ctx context.Context, orderId int) ([]models.CartItem, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`select i.id, i.name, i.description, i.price, i.stock, i.created_at, oi.quantity
+		from order_items oi
+		inner join items i on i.id = oi.item_id
+		where oi.order_id = $1`,
+		orderId,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order with id %d: %w", orderId, err)
+	}
+
+	defer rows.Close()
+
+	items := make([]models.CartItem, 0)
+	for rows.Next() {
+		var item models.CartItem
+		if err := rows.Scan(&item.ID, &item.Name, &item.Description, &item.Price, &item.Stock, &item.CreatedAt, &item.Quantity); err != nil {
+			return nil, fmt.Errorf("failed to scan order row: %w", err)
+		}
+		items = append(items, item)
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return items, nil
+
+}
+
+func (s *PostgresStore) GetOrderLineItemById(ctx context.Context, orderId int) ([]models.LineItem, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`select i.id, oi.quantity, i.price
+		from order_items oi
+		inner join items i on i.id = oi.item_id
+		where oi.order_id = $1`,
+		orderId,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order with id %d: %w", orderId, err)
+	}
+
+	defer rows.Close()
+
+	items := make([]models.LineItem, 0)
+	for rows.Next() {
+		var item models.LineItem
+		if err := rows.Scan(&item.ItemID, &item.Quantity, &item.Price); err != nil {
+			return nil, fmt.Errorf("failed to scan order row: %w", err)
+		}
+		items = append(items, item)
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return items, nil
+
+}
+
+func (s *PostgresStore) GetUserOrders(ctx context.Context, userId int) ([]models.Order, error) {
+	var total int
+	var status string
+
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT id
+		FROM orders
+		WHERE user_id = $1`,
+		userId,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to find order ids: %w", err)
+	}
+
+	defer rows.Close()
+
+	var orderIds = make([]int, 0)
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan order ids: %w", err)
+		}
+		orderIds = append(orderIds, id)
+	}
+
+	var orders = make([]models.Order, 0)
+	for _, orderId := range orderIds {
+		items, err := s.GetOrderLineItemById(ctx, orderId)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan order items: %w", err)
+		}
+
+		s.pool.QueryRow(
+			ctx,
+			`SELECT total, status
+			FROM orders
+			WHERE user_id = $1 AND id = $2`,
+			userId, orderId,
+		).Scan(&total, &status)
+
+		var order = models.Order{
+			ID:     orderId,
+			UserID: userId,
+			Items:  items,
+			Total:  total,
+			Status: status,
+		}
+		orders = append(orders, order)
+	}
+
+	return orders, nil
+
+}

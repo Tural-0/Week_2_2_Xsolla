@@ -28,6 +28,7 @@ type ItemStore interface {
 
 	CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string) (*models.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int, status string) error
+	GetUserOrders(ctx context.Context, userId int) ([]models.Order, error)
 
 	CreateUserCart(ctx context.Context, cart *models.Cart) error
 	UpsertCartItem(ctx context.Context, userID int, itemID int, quantity int) error
@@ -669,4 +670,51 @@ func (h *Handler) GetItemQuantityById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, quantity)
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+func (h *Handler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
+	userIDStr := r.Header.Get("X-User-ID")
+	if userIDStr == "" {
+		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		return
+	}
+
+	//userID := r.Context().Value("userID").(int) // if JWT is a middleware
+
+	orders, err := h.store.GetUserOrders(r.Context(), userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ordersResponse := make([]OrderResponse, 0, len(orders))
+	for _, order := range orders {
+		items := make([]LinteItemResponse, 0, len(order.Items))
+
+		for _, item := range items {
+			items = append(items, LinteItemResponse{
+				ItemID:   item.ItemID,
+				Quantity: item.Quantity,
+				Price:    item.Price,
+			})
+		}
+
+		ordersResponse = append(ordersResponse, OrderResponse{
+			ID:     order.ID,
+			UserID: order.UserID,
+			Items:  items,
+			Total:  order.Total,
+			Status: order.Status,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, orders)
 }
