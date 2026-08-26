@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 
+	"checkout-api/apierrors"
 	"checkout-api/models"
 	"checkout-api/validation"
 )
@@ -155,13 +156,23 @@ func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {
 
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
-		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"missing X-User-ID header",
+		)
 		return
 	}
 
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid X-User-ID header",
+		)
 		return
 	}
 
@@ -169,55 +180,97 @@ func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {
 
 	itemIDStr := r.PathValue("item_id")
 	if itemIDStr == "" {
-		http.Error(w, "missing item_id", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"missing item_id",
+		)
 		return
 	}
 
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
-		writeJSON(w, http.StatusUnprocessableEntity, ErrorMessageResponse{
-			Message: "item_id must be integer",
-		})
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"item_id must be an integer",
+		)
 		return
 	}
 
 	if err := validation.ItemID(itemID); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeValidationError,
+			err.Error(),
+		)
 		return
 	}
 
 	item, err := h.store.GetItem(r.Context(), itemID)
-	if err != nil {
-		writeJSON(w, http.StatusNotFound, ErrorMessageResponse{
-			Message: "No product exists with this item_id",
-		})
+	if err != nil || (err == nil && item == nil) {
+		apierrors.Write(
+			w,
+			http.StatusNotFound,
+			apierrors.CodeNotFound,
+			"item not found with this ID",
+		)
 		return
 	}
 
 	var req UpsertCartItemRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid request body",
+		)
 		return
 	}
 
 	if err := validation.QuantityProvided(req.Quantity); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeValidationError,
+			err.Error(),
+		)
 		return
 	}
 
 	quantity := *req.Quantity
 
 	if err := validation.QuantityIsPositive(quantity); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeBusinessRuleViolation,
+			err.Error(),
+		)
 		return
 	}
 	if err := validation.QuantityWithinStock(quantity, item.Stock); err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeBusinessRuleViolation,
+			err.Error(),
+		)
 		return
 	}
 
 	if err := h.store.UpsertCartItem(r.Context(), userID, itemID, quantity); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			"ran into a problem while executing the update",
+		)
 		return
 	}
 
