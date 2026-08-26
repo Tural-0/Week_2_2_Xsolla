@@ -84,7 +84,12 @@ func mockProcessPayment(amount int) PaymentResult {
 
 func (h *Handler) CreateUserCart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		apierrors.Write(
+			w,
+			http.StatusMethodNotAllowed,
+			apierrors.CodeNotAllowed,
+			"Method not allowed",
+		)
 		return
 	}
 
@@ -92,49 +97,111 @@ func (h *Handler) CreateUserCart(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&cartReq)
 	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"Invalid request body",
+		)
 		return
 	}
 
 	///////////////////
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
-		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"missing X-User-ID header",
+		)
 		return
 	}
 
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid X-User-ID header",
+		)
 		return
 	}
+
 	///////////////////
 
 	//userID := r.Context().Value("userID").(int) // if JWT is a middleware
 
 	items, err := h.store.GetUserCart(r.Context(), userID)
 	if len(items) != 0 {
-		http.Error(w, "cart already exists", http.StatusBadRequest)
-		return
-	}
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"cart already exists",
+		)
 		return
 	}
 
-	if cartReq.Quantity <= 0 {
-		http.Error(w, "quantity must be greater than 0", http.StatusBadRequest)
+	if err != nil {
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			err.Error(),
+		)
+		return
+	}
+
+	if err := validation.QuantityProvided(&cartReq.Quantity); err != nil {
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeValidationError,
+			err.Error(),
+		)
+		return
+	}
+
+	if err := validation.QuantityIsPositive(cartReq.Quantity); err != nil {
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeBusinessRuleViolation,
+			"quantity must be greater than 0",
+		)
+		return
+	}
+
+	if err := validation.ItemID(cartReq.ItemID); err != nil {
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeValidationError,
+			err.Error(),
+		)
 		return
 	}
 
 	item, err := h.store.GetItem(r.Context(), cartReq.ItemID)
 	if err != nil || item == nil {
-		http.Error(w, "item with that ID doesn't exist", http.StatusNotFound)
+		apierrors.Write(
+			w,
+			http.StatusNotFound,
+			apierrors.CodeNotFound,
+			"item with that ID doesn't exist",
+		)
 		return
 	}
 
-	if cartReq.Quantity > item.Stock {
-		http.Error(w, "quantity is greater than stock", http.StatusBadRequest)
+	if err := validation.QuantityWithinStock(cartReq.Quantity, item.Stock); err != nil {
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeBusinessRuleViolation,
+			"quantity is greater than stock",
+		)
 		return
 	}
 
@@ -145,7 +212,12 @@ func (h *Handler) CreateUserCart(w http.ResponseWriter, r *http.Request) {
 	}
 	err = h.store.CreateUserCart(r.Context(), &cart)
 	if err != nil {
-		http.Error(w, "Failed to create cart", http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			"failed to create cart",
+		)
 		return
 	}
 
@@ -280,13 +352,23 @@ func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) RemoveCartItem(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
-		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"missing X-User-ID header",
+		)
 		return
 	}
 
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid X-User-ID header",
+		)
 		return
 	}
 
@@ -294,20 +376,43 @@ func (h *Handler) RemoveCartItem(w http.ResponseWriter, r *http.Request) {
 
 	itemIDStr := r.PathValue("item_id")
 	if itemIDStr == "" {
-		http.Error(w, "missing item_id", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"missing item_id",
+		)
 		return
 	}
 
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
-		writeJSON(w, http.StatusUnprocessableEntity, ErrorMessageResponse{
-			Message: "item_id must be integer",
-		})
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeInvalidRequest,
+			"item_id must be integer",
+		)
+		return
+	}
+
+	if err := validation.ItemID(itemID); err != nil {
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeValidationError,
+			err.Error(),
+		)
 		return
 	}
 
 	if err := h.store.RemoveCartItem(r.Context(), userID, itemID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 
@@ -317,13 +422,23 @@ func (h *Handler) RemoveCartItem(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
-		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"missing X-User-ID header",
+		)
 		return
 	}
 
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid X-User-ID header",
+		)
 		return
 	}
 
@@ -332,6 +447,12 @@ func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
 	cart, err := h.store.GetUserCart(r.Context(), userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
+		apierrors.Write(
+			w,
+			http.StatusNotFound,
+			apierrors.CodeNotFound,
+			err.Error(),
+		)
 		return
 	}
 
@@ -357,13 +478,23 @@ func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteUserCart(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
-		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"missing X-User-ID header",
+		)
 		return
 	}
 
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid X-User-ID header",
+		)
 		return
 	}
 
@@ -371,7 +502,12 @@ func (h *Handler) DeleteUserCart(w http.ResponseWriter, r *http.Request) {
 
 	err = h.store.DeleteUserCart(r.Context(), userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		apierrors.Write(
+			w,
+			http.StatusNotFound,
+			apierrors.CodeNotFound,
+			err.Error(),
+		)
 		return
 	}
 
@@ -381,13 +517,23 @@ func (h *Handler) DeleteUserCart(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
-		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"missing X-User-ID header",
+		)
 		return
 	}
 
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid X-User-ID header",
+		)
 		return
 	}
 
@@ -395,7 +541,12 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	idempotencyKey := r.Header.Get("Idempotency-Key")
 	if idempotencyKey == "" {
-		http.Error(w, "Idempotency-Key header is required", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"Idempotency-Key header is required",
+		)
 		return
 	}
 
@@ -411,12 +562,22 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	var req CreateOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid request body",
+		)
 		return
 	}
 
 	if len(req.LineItems) == 0 {
-		http.Error(w, "items must not be empty", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"items must not be empty",
+		)
 		return
 	}
 
@@ -431,7 +592,12 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	order, err := h.store.CreateOrder(r.Context(), userID, items, req.Total, "pending")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 
@@ -443,7 +609,12 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.UpdateOrderStatus(r.Context(), order.ID, status); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 	order.Status = status
@@ -474,7 +645,12 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
 	items, err := h.store.GetItems(r.Context())
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 
@@ -485,27 +661,55 @@ func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	itemIDStr := r.PathValue("item_id")
 	if itemIDStr == "" {
-		http.Error(w, "URL doesn't contain item ID", http.StatusUnprocessableEntity)
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeInvalidRequest,
+			"URL doesn't contain item ID",
+		)
 		return
 	}
 
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
-		writeJSON(w, http.StatusUnprocessableEntity, ErrorMessageResponse{
-			Message: "item_id must be an integer",
-		})
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeInvalidRequest,
+			"item_id must be an integer",
+		)
+		return
+	}
+
+	if err := validation.ItemID(itemID); err != nil {
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeValidationError,
+			err.Error(),
+		)
 		return
 	}
 
 	item, err := h.store.GetItem(r.Context(), itemID)
 	if err != nil {
 		fmt.Printf("error: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 
 	if item == nil {
-		writeJSON(w, http.StatusNotFound, nil)
+		apierrors.Write(
+			w,
+			http.StatusNotFound,
+			apierrors.CodeNotFound,
+			"item not found with this ID",
+		)
 		return
 	}
 
@@ -523,26 +727,44 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	var req AuthRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid body",
+		)
 		return
 	}
 
 	user, err := h.store.FindUserByEmail(r.Context(), req.Email)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeJSON(w, http.StatusNotFound, ErrorMessageResponse{
-				Message: "user does not exist",
-			})
+			apierrors.Write(
+				w,
+				http.StatusNotFound,
+				apierrors.CodeNotFound,
+				"user does not exist",
+			)
 			return
 		}
 		fmt.Printf("cannot query %q", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 
 	err = bcrypt.CompareHashAndPassword(user.Hash, []byte(req.Password))
 	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		apierrors.Write(
+			w,
+			http.StatusUnauthorized,
+			apierrors.CodeUnauthorized,
+			"Unauthorized",
+		)
 		return
 	}
 	// issue jwt
@@ -557,7 +779,12 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	signedString, err := GenerateJWT(user.ID)
 	if err != nil {
 		fmt.Printf("cannot generate signed string %q", err.Error())
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 
@@ -567,13 +794,23 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	// insert into refresh_tokens (token_value, is_active) values ("sOmERANdomlYGeNERATEDstRing", 1)
 	refreshToken, err := GenerateRefreshToken()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 
 	err = h.store.SaveRefreshToken(r.Context(), user.ID, refreshToken)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 
@@ -587,37 +824,58 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req AuthRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid body",
+		)
 		return
 	}
 
 	// validate email
 	_, err = mail.ParseAddress(req.Email)
 	if err != nil {
-		writeJSON(w, http.StatusUnprocessableEntity, ErrorMessageResponse{
-			Message: "invalid email",
-		})
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeInvalidRequest,
+			"invalid email",
+		)
 		return
 	}
 
 	pwlen := len(req.Password)
 	// validate password
 	if pwlen < 12 || pwlen > 25 {
-		writeJSON(w, http.StatusUnprocessableEntity, ErrorMessageResponse{
-			Message: "password is too short or too long",
-		})
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeInvalidRequest,
+			"password is too short or too long (12 < x < 25)",
+		)
 		return
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 
 	err = h.store.SaveUser(r.Context(), req.Email, hash)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 
@@ -660,42 +918,77 @@ func (h *Handler) IssueJWT(w http.ResponseWriter, r *http.Request) {
 	var req RefreshRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid request body",
+		)
 		return
 	}
 
 	userID, active, err := h.store.GetRefreshToken(r.Context(), req.RefreshToken)
 	if err != nil {
-		http.Error(w, "refresh token not found", http.StatusUnauthorized)
+		apierrors.Write(
+			w,
+			http.StatusUnauthorized,
+			apierrors.CodeUnauthorized,
+			"refresh token not found",
+		)
 		return
 	}
 
 	if !active {
-		http.Error(w, "refresh token inactive", http.StatusUnauthorized)
+		apierrors.Write(
+			w,
+			http.StatusUnauthorized,
+			apierrors.CodeUnauthorized,
+			"refresh token inactive",
+		)
 		return
 	}
 
 	jwtToken, err := GenerateJWT(userID)
 	if err != nil {
-		http.Error(w, "failed to generate jwt", http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			"failed to generate JWT",
+		)
 		return
 	}
 
 	newRefreshToken, err := GenerateRefreshToken()
 	if err != nil {
-		http.Error(w, "failed to generate refresh token", http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			"failed to generate refresh token",
+		)
 		return
 	}
 
 	err = h.store.SaveRefreshToken(r.Context(), userID, newRefreshToken)
 	if err != nil {
-		http.Error(w, "failed to save refresh token", http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			"failed to save refresh token",
+		)
 		return
 	}
 
 	err = h.store.DeactivateRefreshToken(r.Context(), req.RefreshToken)
 	if err != nil {
-		http.Error(w, "failed to deactivate refresh token", http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			"failed to deactivate refresh token",
+		)
 		return
 	}
 
@@ -711,39 +1004,78 @@ func (h *Handler) IssueJWT(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetItemQuantityByID(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
-		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"missing X-User-ID header",
+		)
 		return
 	}
 
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid X-User-ID header",
+		)
 		return
 	}
 
 	itemIDStr := r.PathValue("item_id")
 	if itemIDStr == "" {
-		http.Error(w, "Not Found", http.StatusUnprocessableEntity)
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeInvalidRequest,
+			"URL doesn't contain item_id inside",
+		)
 		return
 	}
 
 	itemID, err := strconv.Atoi(itemIDStr)
 	if err != nil {
-		writeJSON(w, http.StatusUnprocessableEntity, ErrorMessageResponse{
-			Message: "item_id must be an integer",
-		})
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeInvalidRequest,
+			"item_id must be an integer",
+		)
 		return
 	}
 
+	if err := validation.ItemID(itemID); err != nil {
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeValidationError,
+			err.Error(),
+		)
+	}
+
 	quantity, err := h.store.GetItemQuantityByID(r.Context(), userID, itemID)
-	if quantity <= 0 {
-		writeJSON(w, http.StatusOK, quantity)
+
+	if quantity <= 0 && err == nil {
+		apierrors.Write(
+			w,
+			http.StatusNotFound,
+			apierrors.CodeNotFound,
+			"this item doesn't exist",
+		)
 		return
 	}
 
 	if err != nil {
 		fmt.Printf("error: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 
@@ -755,13 +1087,23 @@ func (h *Handler) GetItemQuantityByID(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
-		http.Error(w, "missing X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"missing X-User-ID header",
+		)
 		return
 	}
 
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
-		http.Error(w, "invalid X-User-ID header", http.StatusBadRequest)
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			"invalid X-User-ID header",
+		)
 		return
 	}
 
@@ -769,7 +1111,12 @@ func (h *Handler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 
 	orders, err := h.store.GetUserOrders(r.Context(), userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			err.Error(),
+		)
 		return
 	}
 

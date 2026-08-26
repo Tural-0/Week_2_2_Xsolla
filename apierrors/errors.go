@@ -14,6 +14,7 @@ const (
 	CodeNotFound              = "NOT_FOUND"
 	CodeConflict              = "CONFLICT"
 	CodeInternal              = "INTERNAL_ERROR"
+	CodeNotAllowed            = "NOT_ALLOWED"
 )
 
 type Response struct {
