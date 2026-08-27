@@ -478,3 +478,136 @@ func (s *PostgresStore) GetUserOrders(ctx context.Context, userID int) ([]models
 	return orders, nil
 
 }
+
+func (s *PostgresStore) GetUserOrdersOffset(
+	ctx context.Context,
+	userID int,
+	limit int,
+	offset int,
+) ([]models.Order, error) {
+	var total int
+	var status string
+
+	rows, err := s.pool.Query(
+		ctx,
+		`
+		SELECT id
+		FROM orders
+		WHERE user_id = $1
+		ORDER BY id DESC
+		LIMIT $2 OFFSET $3
+		`,
+		userID,
+		limit,
+		offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orderIDs = make([]int, 0)
+	for rows.Next() {
+		var ID int
+		if err := rows.Scan(&ID); err != nil {
+			return nil, fmt.Errorf("failed to scan order IDs: %w", err)
+		}
+		orderIDs = append(orderIDs, ID)
+	}
+
+	var orders = make([]models.Order, 0)
+	for _, orderID := range orderIDs {
+		items, err := s.GetOrderLineItemByID(ctx, orderID)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan order items: %w", err)
+		}
+
+		s.pool.QueryRow(
+			ctx,
+			`SELECT total, status
+			FROM orders
+			WHERE user_id = $1 AND id = $2`,
+			userID, orderID,
+		).Scan(&total, &status)
+
+		var order = models.Order{
+			ID:     orderID,
+			UserID: userID,
+			Items:  items,
+			Total:  total,
+			Status: status,
+		}
+		orders = append(orders, order)
+	}
+
+	return orders, nil
+
+}
+
+func (s *PostgresStore) GetUserOrdersCursor(
+	ctx context.Context,
+	userID int,
+	limit int,
+	cursor *int,
+) ([]models.Order, error) {
+	var total int
+	var status string
+
+	rows, err := s.pool.Query(
+		ctx,
+		`
+		SELECT id
+		FROM orders
+		WHERE user_id = $1
+		AND ($2::int IS NULL OR id > $2)
+		ORDER BY id DESC
+		LIMIT $3
+		`,
+		userID,
+		cursor,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orderIDs = make([]int, 0)
+	for rows.Next() {
+		var ID int
+		if err := rows.Scan(&ID); err != nil {
+			return nil, fmt.Errorf("failed to scan order IDs: %w", err)
+		}
+		orderIDs = append(orderIDs, ID)
+	}
+
+	var orders = make([]models.Order, 0)
+	for _, orderID := range orderIDs {
+		items, err := s.GetOrderLineItemByID(ctx, orderID)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan order items: %w", err)
+		}
+
+		s.pool.QueryRow(
+			ctx,
+			`SELECT total, status
+			FROM orders
+			WHERE user_id = $1 AND id = $2`,
+			userID, orderID,
+		).Scan(&total, &status)
+
+		var order = models.Order{
+			ID:     orderID,
+			UserID: userID,
+			Items:  items,
+			Total:  total,
+			Status: status,
+		}
+		orders = append(orders, order)
+	}
+
+	return orders, nil
+
+}

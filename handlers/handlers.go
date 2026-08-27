@@ -34,6 +34,8 @@ type ItemStore interface {
 	CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string) (*models.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int, status string) error
 	GetUserOrders(ctx context.Context, userID int) ([]models.Order, error)
+	GetUserOrdersOffset(ctx context.Context, userID int, limit int, offset int) ([]models.Order, error)
+	GetUserOrdersCursor(ctx context.Context, userID int, limit int, cursor *int) ([]models.Order, error)
 
 	CreateUserCart(ctx context.Context, cart *models.Cart) error
 	UpsertCartItem(ctx context.Context, userID int, itemID int, quantity int) error
@@ -721,7 +723,7 @@ func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
 			w,
 			http.StatusInternalServerError,
 			apierrors.CodeInternal,
-			"internal server error at GetItemsOffset",
+			err.Error(),
 		)
 		return
 	}
@@ -1178,6 +1180,9 @@ func (h *Handler) GetItemQuantityByID(w http.ResponseWriter, r *http.Request) {
 /////////////////////////////////////////////////////////////////////////////////
 
 func (h *Handler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
+
+	query := r.URL.Query()
+
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
 		apierrors.Write(
@@ -1202,7 +1207,71 @@ func (h *Handler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 
 	//userID := r.Context().Value("userID").(int) // if JWT is a middleware
 
-	orders, err := h.store.GetUserOrders(r.Context(), userID)
+	if query.Get("cursor") != "" {
+		params, err := pagination.ParseCursor(r)
+		if err != nil {
+			apierrors.Write(
+				w,
+				http.StatusBadRequest,
+				apierrors.CodeInvalidRequest,
+				err.Error(),
+			)
+			return
+		}
+
+		orders, err := h.store.GetUserOrdersCursor(
+			r.Context(),
+			userID,
+			params.Limit,
+			params.Cursor,
+		)
+		if err != nil {
+			apierrors.Write(
+				w,
+				http.StatusInternalServerError,
+				apierrors.CodeInternal,
+				err.Error(),
+			)
+			return
+		}
+
+		var nextCursor *int
+
+		if len(orders) > 0 {
+			lastID := orders[len(orders)-1].ID
+			nextCursor = &lastID
+		}
+
+		response := CursorResponse[models.Order]{
+			Data: orders,
+			Pagination: CursorMeta{
+				Limit:      params.Limit,
+				NextCursor: nextCursor,
+			},
+		}
+
+		writeJSON(w, http.StatusOK, response)
+		return
+	}
+
+	params, err := pagination.ParseOffset(r)
+	if err != nil {
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
+			err.Error(),
+		)
+		return
+	}
+
+	orders, err := h.store.GetUserOrdersOffset(
+		r.Context(),
+		userID,
+		params.Limit,
+		params.Offset,
+	)
+
 	if err != nil {
 		apierrors.Write(
 			w,
@@ -1213,26 +1282,47 @@ func (h *Handler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ordersResponse := make([]OrderResponse, 0, len(orders))
-	for _, order := range orders {
-		items := make([]LinteItemResponse, 0, len(order.Items))
-
-		for _, item := range order.Items {
-			items = append(items, LinteItemResponse{
-				ItemID:   item.ItemID,
-				Quantity: item.Quantity,
-				Price:    item.Price,
-			})
-		}
-
-		ordersResponse = append(ordersResponse, OrderResponse{
-			ID:     order.ID,
-			UserID: order.UserID,
-			Items:  items,
-			Total:  order.Total,
-			Status: order.Status,
-		})
+	response := OffsetResponse[models.Order]{
+		Data: orders,
+		Pagination: OffsetMeta{
+			Limit:  params.Limit,
+			Offset: params.Offset,
+		},
 	}
 
-	writeJSON(w, http.StatusOK, orders)
+	writeJSON(w, http.StatusOK, response)
+
+	// orders, err := h.store.GetUserOrders(r.Context(), userID)
+	// if err != nil {
+	// 	apierrors.Write(
+	// 		w,
+	// 		http.StatusInternalServerError,
+	// 		apierrors.CodeInternal,
+	// 		err.Error(),
+	// 	)
+	// 	return
+	// }
+
+	// ordersResponse := make([]OrderResponse, 0, len(orders))
+	// for _, order := range orders {
+	// 	items := make([]LinteItemResponse, 0, len(order.Items))
+
+	// 	for _, item := range order.Items {
+	// 		items = append(items, LinteItemResponse{
+	// 			ItemID:   item.ItemID,
+	// 			Quantity: item.Quantity,
+	// 			Price:    item.Price,
+	// 		})
+	// 	}
+
+	// 	ordersResponse = append(ordersResponse, OrderResponse{
+	// 		ID:     order.ID,
+	// 		UserID: order.UserID,
+	// 		Items:  items,
+	// 		Total:  order.Total,
+	// 		Status: order.Status,
+	// 	})
+	// }
+
+	// writeJSON(w, http.StatusOK, orders)
 }
