@@ -321,6 +321,34 @@ func (s *testStore) GetItemsOffset(_ context.Context, a int, b int) ([]models.It
 	return items, nil
 }
 
+func (s *testStore) GetUserOrdersCursor(_ context.Context, c int, a int, b *int) ([]models.Order, error) {
+	orders := make([]models.Order, 0, len(s.orders))
+
+	for _, order := range s.orders {
+		orders = append(orders, *order)
+	}
+
+	slices.SortFunc(orders, func(a, b models.Order) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
+
+	return orders, nil
+}
+
+func (s *testStore) GetUserOrdersOffset(_ context.Context, c int, a int, b int) ([]models.Order, error) {
+	orders := make([]models.Order, 0, len(s.items))
+
+	for _, order := range s.orders {
+		orders = append(orders, *order)
+	}
+
+	slices.SortFunc(orders, func(a, b models.Order) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
+
+	return orders, nil
+}
+
 // --------------------------------------------------
 // Tests
 // --------------------------------------------------

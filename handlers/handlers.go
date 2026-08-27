@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/mail"
 	"os"
 	"strconv"
 	"time"
@@ -174,7 +173,7 @@ func (h *Handler) CreateUserCart(w http.ResponseWriter, r *http.Request) {
 			w,
 			http.StatusBadRequest,
 			apierrors.CodeBusinessRuleViolation,
-			"quantity must be greater than 0",
+			err.Error(),
 		)
 		return
 	}
@@ -576,12 +575,12 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.LineItems) == 0 {
+	if err := validation.NonEmptyCart(req.LineItems); err != nil {
 		apierrors.Write(
 			w,
-			http.StatusBadRequest,
-			apierrors.CodeInvalidRequest,
-			"items must not be empty",
+			http.StatusUnprocessableEntity,
+			apierrors.CodeBusinessRuleViolation,
+			err.Error(),
 		)
 		return
 	}
@@ -831,6 +830,26 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.Email = validation.Email(req.Email)
+
+	if err := validation.RequiredString(req.Email, "Email"); err != nil {
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeValidationError,
+			err.Error(),
+		)
+	}
+
+	if err := validation.RequiredString(req.Password, "Password"); err != nil {
+		apierrors.Write(
+			w,
+			http.StatusBadRequest,
+			apierrors.CodeValidationError,
+			err.Error(),
+		)
+	}
+
 	user, err := h.store.FindUserByEmail(r.Context(), req.Email)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -838,7 +857,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 				w,
 				http.StatusNotFound,
 				apierrors.CodeNotFound,
-				"user does not exist",
+				"Invalid Credentials",
 			)
 			return
 		}
@@ -929,25 +948,34 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// validate email
-	_, err = mail.ParseAddress(req.Email)
-	if err != nil {
+	req.Email = validation.Email(req.Email)
+
+	if err := validation.RequiredString(req.Email, "Email"); err != nil {
 		apierrors.Write(
 			w,
 			http.StatusUnprocessableEntity,
 			apierrors.CodeInvalidRequest,
-			"invalid email",
+			err.Error(),
 		)
 		return
 	}
 
-	pwlen := len(req.Password)
-	// validate password
-	if pwlen < 12 || pwlen > 25 {
+	if err := validation.EmailCheck(req.Email); err != nil {
 		apierrors.Write(
 			w,
 			http.StatusUnprocessableEntity,
 			apierrors.CodeInvalidRequest,
-			"password is too short or too long (12 < x < 25)",
+			err.Error(),
+		)
+		return
+	}
+
+	if err := validation.PasswordCheck(req.Password); err != nil {
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeInvalidRequest,
+			err.Error(),
 		)
 		return
 	}
