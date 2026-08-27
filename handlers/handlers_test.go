@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -289,6 +291,34 @@ func (s *testStore) DeactivateRefreshToken(
 	}
 
 	return nil
+}
+
+func (s *testStore) GetItemsCursor(_ context.Context, a int, b *int) ([]models.Item, error) {
+	items := make([]models.Item, 0, len(s.items))
+
+	for _, item := range s.items {
+		items = append(items, *item)
+	}
+
+	slices.SortFunc(items, func(a, b models.Item) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
+
+	return items, nil
+}
+
+func (s *testStore) GetItemsOffset(_ context.Context, a int, b int) ([]models.Item, error) {
+	items := make([]models.Item, 0, len(s.items))
+
+	for _, item := range s.items {
+		items = append(items, *item)
+	}
+
+	slices.SortFunc(items, func(a, b models.Item) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
+
+	return items, nil
 }
 
 // --------------------------------------------------

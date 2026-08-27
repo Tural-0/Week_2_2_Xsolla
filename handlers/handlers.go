@@ -19,6 +19,7 @@ import (
 
 	"checkout-api/apierrors"
 	"checkout-api/models"
+	"checkout-api/pagination"
 	"checkout-api/validation"
 )
 
@@ -27,6 +28,8 @@ type ItemStore interface {
 	GetItems(ctx context.Context) ([]*models.Item, error)
 	GetItem(ctx context.Context, ID int) (*models.Item, error)
 	GetItemQuantityByID(ctx context.Context, userID int, itemID int) (int, error)
+	GetItemsOffset(ctx context.Context, limit int, offset int) ([]models.Item, error)
+	GetItemsCursor(ctx context.Context, limit int, cursor *int) ([]models.Item, error)
 
 	CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string) (*models.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int, status string) error
@@ -643,18 +646,108 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 // GetItems handles GET /items — returns all available items.
 func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
-	items, err := h.store.GetItems(r.Context())
+
+	query := r.URL.Query()
+
+	// Cursor pagination
+
+	if query.Get("cursor") != "" {
+		params, err := pagination.ParseCursor(r)
+		if err != nil {
+			apierrors.Write(
+				w,
+				http.StatusBadRequest,
+				apierrors.CodeInvalidRequest,
+				err.Error(),
+			)
+			return
+		}
+
+		items, err := h.store.GetItemsCursor(
+			r.Context(),
+			params.Limit,
+			params.Cursor,
+		)
+		if err != nil {
+			apierrors.Write(
+				w,
+				http.StatusInternalServerError,
+				apierrors.CodeInternal,
+				err.Error(),
+				// "internal server error at GetItemsCursor",
+			)
+			return
+		}
+
+		var nextCursor *int
+
+		if len(items) > 0 {
+			lastID := items[len(items)-1].ID
+			nextCursor = &lastID
+		}
+
+		response := CursorResponse[models.Item]{
+			Data: items,
+			Pagination: CursorMeta{
+				Limit:      params.Limit,
+				NextCursor: nextCursor,
+			},
+		}
+
+		writeJSON(w, http.StatusOK, response)
+		return
+	}
+
+	// Offset pagination
+
+	params, err := pagination.ParseOffset(r)
 	if err != nil {
 		apierrors.Write(
 			w,
-			http.StatusInternalServerError,
-			apierrors.CodeInternal,
+			http.StatusBadRequest,
+			apierrors.CodeInvalidRequest,
 			err.Error(),
 		)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, items)
+	items, err := h.store.GetItemsOffset(
+		r.Context(),
+		params.Limit,
+		params.Offset,
+	)
+	if err != nil {
+		apierrors.Write(
+			w,
+			http.StatusInternalServerError,
+			apierrors.CodeInternal,
+			"internal server error at GetItemsOffset",
+		)
+		return
+	}
+
+	response := OffsetResponse[models.Item]{
+		Data: items,
+		Pagination: OffsetMeta{
+			Limit:  params.Limit,
+			Offset: params.Offset,
+		},
+	}
+
+	writeJSON(w, http.StatusOK, response)
+
+	// items, err = h.store.GetItems(r.Context())
+	// if err != nil {
+	// 	apierrors.Write(
+	// 		w,
+	// 		http.StatusInternalServerError,
+	// 		apierrors.CodeInternal,
+	// 		err.Error(),
+	// 	)
+	// 	return
+	// }
+
+	// writeJSON(w, http.StatusOK, items)
 }
 
 // GetItemByID handles GET /items/{id} — returns a single i`tem.

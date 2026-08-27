@@ -58,6 +58,93 @@ func (s *PostgresStore) GetItems(ctx context.Context) ([]*models.Item, error) {
 	return items, nil
 }
 
+func (s *PostgresStore) GetItemsOffset(
+	ctx context.Context,
+	limit int,
+	offset int,
+) ([]models.Item, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT id, name, description, price, stock, created_at
+		FROM items
+		ORDER BY id
+		LIMIT $1 OFFSET $2`,
+		limit,
+		offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []models.Item
+
+	for rows.Next() {
+		var item models.Item
+
+		if err := rows.Scan(
+			&item.ID, &item.Name,
+			&item.Description, &item.Price,
+			&item.Stock, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
+func (s *PostgresStore) GetItemsCursor(
+	ctx context.Context,
+	limit int,
+	cursor *int,
+) ([]models.Item, error) {
+	query := `
+		SELECT id, name, description, price, stock, created_at
+		FROM items
+		WHERE ($1::int IS NULL OR id > $1)
+		ORDER BY id
+		LIMIT $2
+	`
+
+	rows, err := s.pool.Query(
+		ctx,
+		query,
+		cursor,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []models.Item
+
+	for rows.Next() {
+		var item models.Item
+
+		if err := rows.Scan(
+			&item.ID, &item.Name,
+			&item.Description, &item.Price,
+			&item.Stock, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
 func (s *PostgresStore) GetItem(ctx context.Context, ID int) (*models.Item, error) {
 	var item models.Item
 	err := s.DB().GetItemByID(ctx, ID).Scan(&item.ID, &item.Name, &item.Description, &item.Price, &item.Stock, &item.CreatedAt)

@@ -55,3 +55,23 @@ type AuthResponse struct {
 	JWT          string `json:"jwt"`
 	RefreshToken string `json:"refresh_token"`
 }
+
+type OffsetMeta struct {
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+}
+
+type OffsetResponse[T any] struct {
+	Data       []T        `json:"data"`
+	Pagination OffsetMeta `json:"pagination"`
+}
+
+type CursorMeta struct {
+	Limit      int  `json:"limit"`
+	NextCursor *int `json:"next_cursor,omitempty"`
+}
+
+type CursorResponse[T any] struct {
+	Data       []T        `json:"data"`
+	Pagination CursorMeta `json:"pagination"`
+}
