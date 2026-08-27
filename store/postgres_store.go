@@ -560,7 +560,7 @@ func (s *PostgresStore) GetUserOrdersCursor(
 		SELECT id
 		FROM orders
 		WHERE user_id = $1
-		AND ($2::int IS NULL OR id > $2)
+		AND ($2::int IS NULL OR id < $2)
 		ORDER BY id DESC
 		LIMIT $3
 		`,

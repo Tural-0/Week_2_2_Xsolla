@@ -340,7 +340,6 @@ func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.UpsertCartItem(r.Context(), userID, itemID, quantity); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		apierrors.Write(
 			w,
 			http.StatusInternalServerError,
@@ -450,7 +449,6 @@ func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
 
 	cart, err := h.store.GetUserCart(r.Context(), userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
 		apierrors.Write(
 			w,
 			http.StatusNotFound,
@@ -839,6 +837,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 			apierrors.CodeValidationError,
 			err.Error(),
 		)
+		return
 	}
 
 	if err := validation.RequiredString(req.Password, "Password"); err != nil {
@@ -848,6 +847,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 			apierrors.CodeValidationError,
 			err.Error(),
 		)
+		return
 	}
 
 	user, err := h.store.FindUserByEmail(r.Context(), req.Email)
@@ -1176,6 +1176,7 @@ func (h *Handler) GetItemQuantityByID(w http.ResponseWriter, r *http.Request) {
 			apierrors.CodeValidationError,
 			err.Error(),
 		)
+		return
 	}
 
 	quantity, err := h.store.GetItemQuantityByID(r.Context(), userID, itemID)
@@ -1192,7 +1193,6 @@ func (h *Handler) GetItemQuantityByID(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		fmt.Printf("error: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		apierrors.Write(
 			w,
 			http.StatusInternalServerError,
