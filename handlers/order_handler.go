@@ -90,16 +90,43 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.DiscountCode = validation.String(req.DiscountCode)
+	discDetails, err := h.store.GetDiscountDetails(r.Context(), req.DiscountCode)
+	if err != nil {
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeBusinessRuleViolation,
+			"Discount is invalid",
+		)
+		return
+	}
+	if err := validation.DiscountCheck(discDetails); err != nil {
+		apierrors.Write(
+			w,
+			http.StatusUnprocessableEntity,
+			apierrors.CodeBusinessRuleViolation,
+			err.Error(),
+		)
+		return
+	}
+
 	items := make([]models.LineItem, 0, len(req.LineItems))
+	var total = 0
 	for _, i := range req.LineItems {
 		items = append(items, models.LineItem{
 			ItemID:   i.ItemID,
 			Quantity: i.Quantity,
 			Price:    i.Price,
 		})
+		total += i.Quantity * i.Price
 	}
 
-	order, err := h.store.CreateOrder(r.Context(), userID, items, req.Total, "pending")
+	if total != req.Total {
+		req.Total = total
+	}
+
+	order, err := h.store.CreateOrder(r.Context(), userID, items, req.Total, "pending", discDetails.Amount)
 	if err != nil {
 		apierrors.Write(
 			w,

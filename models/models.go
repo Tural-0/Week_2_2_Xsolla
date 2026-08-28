@@ -51,3 +51,10 @@ type User struct {
 	Email string `json:"email"`
 	Hash  []byte
 }
+
+type Discount struct {
+	ID      int       `json:"discount_id"`
+	Code    string    `json:"code"`
+	Amount  int       `json:"amount"`
+	Ends_at time.Time `json:"ends_at"`
+}

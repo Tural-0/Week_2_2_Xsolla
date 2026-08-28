@@ -232,3 +232,13 @@ func (q *Query) GetUserOrdersCursor(ctx context.Context, userID int, limit int, 
 		limit,
 	)
 }
+
+func (q *Query) GetDiscountCode(ctx context.Context, discount string) pgx.Row {
+	return q.DBTX.QueryRow(
+		ctx,
+		`SELECT code, amount, ends_at
+		FROM discount_codes
+		WHERE code = $1`,
+		discount,
+	)
+}

@@ -1,9 +1,11 @@
 package validation
 
 import (
+	"checkout-api/models"
 	"errors"
 	"net/mail"
 	"reflect"
+	"time"
 )
 
 var (
@@ -13,6 +15,8 @@ var (
 	ErrNotAnArray        = errors.New("provided argument is not an array")
 	ErrInvalidEmail      = errors.New("this email is invalid")
 	ErrInvalidPassword   = errors.New("password does not fulfill the requirements")
+	ErrInvalidDiscount   = errors.New("this discount code is not valid")
+	ErrLateDiscount      = errors.New("this discount code has expired")
 )
 
 func QuantityIsPositive(quantity int) error {
@@ -61,5 +65,16 @@ func PasswordCheck(pass string) error {
 		return ErrInvalidPassword
 	}
 
+	return nil
+}
+
+func DiscountCheck(discount models.Discount) error {
+	if discount.Code == "" {
+		return nil
+	}
+
+	if discount.Ends_at.Compare(time.Now()) == -1 {
+		return ErrLateDiscount
+	}
 	return nil
 }

@@ -19,11 +19,13 @@ type ItemStore interface {
 	GetItemsOffset(ctx context.Context, limit int, offset int) ([]models.Item, error)
 	GetItemsCursor(ctx context.Context, limit int, cursor *int) ([]models.Item, error)
 
-	CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string) (*models.Order, error)
+	CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string, discount int) (*models.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID int, status string) error
 	GetUserOrders(ctx context.Context, userID int) ([]models.Order, error)
 	GetUserOrdersOffset(ctx context.Context, userID int, limit int, offset int) ([]models.Order, error)
 	GetUserOrdersCursor(ctx context.Context, userID int, limit int, cursor *int) ([]models.Order, error)
+
+	GetDiscountDetails(ctx context.Context, discountCode string) (models.Discount, error)
 
 	CreateUserCart(ctx context.Context, cart *models.Cart) error
 	UpsertCartItem(ctx context.Context, userID int, itemID int, quantity int) error

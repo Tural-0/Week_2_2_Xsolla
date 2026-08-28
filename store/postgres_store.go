@@ -137,7 +137,7 @@ func (s *PostgresStore) GetItem(ctx context.Context, ID int) (*models.Item, erro
 	return &item, nil
 }
 
-func (s *PostgresStore) CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string) (*models.Order, error) {
+func (s *PostgresStore) CreateOrder(ctx context.Context, userID int, items []models.LineItem, total int, status string, discount int) (*models.Order, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -178,6 +178,8 @@ func (s *PostgresStore) CreateOrder(ctx context.Context, userID int, items []mod
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
+
+	total = total - (total / 100 * discount)
 
 	return &models.Order{
 		ID:     orderID,
@@ -500,5 +502,23 @@ func (s *PostgresStore) GetUserOrdersCursor(
 	}
 
 	return orders, nil
+
+}
+
+func (s *PostgresStore) GetDiscountDetails(ctx context.Context, discountCode string) (models.Discount, error) {
+	var disc models.Discount
+
+	err := s.DB().GetDiscountCode(ctx, discountCode).Scan(&disc.Code, &disc.Amount, &disc.Ends_at)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			fmt.Print("no rows")
+			return models.Discount{}, fmt.Errorf("this discount code is invalid")
+		}
+		fmt.Printf("err occured")
+		fmt.Print(err)
+		return models.Discount{}, fmt.Errorf("failed to get discount details: %w", err)
+	}
+
+	return disc, nil
 
 }

@@ -650,6 +650,9 @@ const docTemplate = `{
         "handlers.CreateOrderRequest": {
             "type": "object",
             "properties": {
+                "discount": {
+                    "type": "string"
+                },
                 "line_items": {
                     "type": "array",
                     "items": {

@@ -5,8 +5,9 @@ type UpsertCartItemRequest struct {
 }
 
 type CreateOrderRequest struct {
-	LineItems []LineItemRequest `json:"line_items"`
-	Total     int               `json:"total"`
+	LineItems    []LineItemRequest `json:"line_items"`
+	Total        int               `json:"total"`
+	DiscountCode string            `json:"discount"`
 }
 
 type LineItemRequest struct {
