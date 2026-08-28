@@ -21,6 +21,33 @@ func (q *Query) GetItems(ctx context.Context) (pgx.Rows, error) {
 	return q.DBTX.Query(ctx, "select id, name, description, price, stock, created_at from items")
 }
 
+func (q *Query) GetItemsOffset(ctx context.Context, limit int, offset int) (pgx.Rows, error) {
+	return q.DBTX.Query(
+		ctx,
+		`SELECT id, name, description, price, stock, created_at
+		FROM items
+		ORDER BY id
+		LIMIT $1 OFFSET $2`,
+		limit,
+		offset,
+	)
+}
+
+func (q *Query) GetItemsCursor(ctx context.Context, limit int, cursor *int) (pgx.Rows, error) {
+	return q.DBTX.Query(
+		ctx,
+		`
+		SELECT id, name, description, price, stock, created_at
+		FROM items
+		WHERE ($1::int IS NULL OR id > $1)
+		ORDER BY id
+		LIMIT $2
+		`,
+		cursor,
+		limit,
+	)
+}
+
 func (q *Query) GetItemByID(ctx context.Context, id int) pgx.Row {
 	return q.DBTX.QueryRow(ctx, "select id, name, description, price, stock, created_at from items where id = $1", id)
 }
@@ -45,6 +72,14 @@ func (q *Query) InsertOrderReturning(ctx context.Context, userID int, total int,
 
 func (q *Query) UpdateOrderStatus(ctx context.Context, orderID int, status string) (pgconn.CommandTag, error) {
 	return q.DBTX.Exec(ctx, "update orders set status = $1 where id = $2", status, orderID)
+}
+
+func (q *Query) CreateUserCart(ctx context.Context, userID int, itemID int, quantity int) (pgconn.CommandTag, error) {
+	return q.DBTX.Exec(
+		ctx,
+		`INSERT INTO carts (user_id, item_id, quantity)
+		VALUES ($1, $2, $3)", userID, itemID, quantity)`,
+	)
 }
 
 func (q *Query) InsertLineItem(ctx context.Context, orderID int, itemID int, price int, quantity int) (pgconn.CommandTag, error) {
@@ -80,4 +115,120 @@ func (q *Query) InsertUser(ctx context.Context, email string, hash []byte) (pgco
 
 func (q *Query) GetUserByEmail(ctx context.Context, email string) pgx.Row {
 	return q.DBTX.QueryRow(ctx, "select id, email, hash from users where email = $1", email)
+}
+
+func (q *Query) GetRefreshToken(ctx context.Context, token string) pgx.Row {
+	return q.DBTX.QueryRow(
+		ctx,
+		`SELECT user_id, active
+		 FROM refresh_tokens
+		 WHERE token = $1`,
+		token,
+	)
+}
+
+func (q *Query) SaveRefreshToken(ctx context.Context, userID int, token string) (pgconn.CommandTag, error) {
+	return q.DBTX.Exec(
+		ctx,
+		`INSERT INTO refresh_tokens
+		(token, user_id, active)
+		VALUES ($1, $2, TRUE)`,
+		token,
+		userID,
+	)
+}
+
+func (q *Query) DeactivateRefreshToken(ctx context.Context, token string) (pgconn.CommandTag, error) {
+	return q.DBTX.Exec(
+		ctx,
+		`UPDATE refresh_tokens
+		 SET active = FALSE
+		 WHERE token = $1`,
+		token,
+	)
+}
+
+func (q *Query) GetItemQuantityByID(ctx context.Context, userID int, itemID int) pgx.Row {
+	return q.DBTX.QueryRow(
+		ctx,
+		`SELECT quantity
+		 FROM carts
+		 WHERE user_id = $1 AND item_id = $2`,
+		userID, itemID,
+	)
+}
+
+func (q *Query) GetOrderByID(ctx context.Context, orderID int) (pgx.Rows, error) {
+	return q.DBTX.Query(
+		ctx,
+		`select i.id, i.name, i.description, i.price, i.stock, i.created_at, oi.quantity
+		from order_items oi
+		inner join items i on i.id = oi.item_id
+		where oi.order_id = $1`,
+		orderID,
+	)
+}
+
+func (q *Query) GetOrderLineItemByID(ctx context.Context, orderID int) (pgx.Rows, error) {
+	return q.DBTX.Query(
+		ctx,
+		`select i.id, oi.quantity, i.price
+		from order_items oi
+		inner join items i on i.id = oi.item_id
+		where oi.order_id = $1`,
+		orderID,
+	)
+}
+
+func (q *Query) GetUserOrderIDs(ctx context.Context, userID int) (pgx.Rows, error) {
+	return q.DBTX.Query(
+		ctx,
+		`SELECT id
+		FROM orders
+		WHERE user_id = $1`,
+		userID,
+	)
+}
+
+func (q *Query) GetOrderTotalStatus(ctx context.Context, userID int, orderID int) pgx.Row {
+	return q.DBTX.QueryRow(
+		ctx,
+		`SELECT total, status
+		FROM orders
+		WHERE user_id = $1 AND id = $2`,
+		userID, orderID,
+	)
+}
+
+func (q *Query) GetUserOrdersOffset(ctx context.Context, userID int, limit int, offset int) (pgx.Rows, error) {
+	return q.DBTX.Query(
+		ctx,
+		`
+		SELECT id
+		FROM orders
+		WHERE user_id = $1
+		ORDER BY id DESC
+		LIMIT $2 OFFSET $3
+		`,
+		userID,
+		limit,
+		offset,
+	)
+}
+
+func (q *Query) GetUserOrdersCursor(ctx context.Context, userID int, limit int, cursor *int) (pgx.Rows, error) {
+	return q.DBTX.Query(
+		ctx,
+		`
+		SELECT id
+		FROM orders
+		WHERE user_id = $1
+		AND ($2::int IS NULL OR id < $2)
+		ORDER BY id DESC
+		LIMIT $3
+		`,
+		userID,
+		cursor,
+		limit,
+	)
 }

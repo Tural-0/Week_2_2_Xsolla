@@ -63,15 +63,7 @@ func (s *PostgresStore) GetItemsOffset(
 	limit int,
 	offset int,
 ) ([]models.Item, error) {
-	rows, err := s.pool.Query(
-		ctx,
-		`SELECT id, name, description, price, stock, created_at
-		FROM items
-		ORDER BY id
-		LIMIT $1 OFFSET $2`,
-		limit,
-		offset,
-	)
+	rows, err := s.DB().GetItemsOffset(ctx, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -104,20 +96,8 @@ func (s *PostgresStore) GetItemsCursor(
 	limit int,
 	cursor *int,
 ) ([]models.Item, error) {
-	query := `
-		SELECT id, name, description, price, stock, created_at
-		FROM items
-		WHERE ($1::int IS NULL OR id > $1)
-		ORDER BY id
-		LIMIT $2
-	`
 
-	rows, err := s.pool.Query(
-		ctx,
-		query,
-		cursor,
-		limit,
-	)
+	rows, err := s.DB().GetItemsCursor(ctx, limit, cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -214,8 +194,7 @@ func (s *PostgresStore) UpdateOrderStatus(ctx context.Context, orderID int, stat
 }
 
 func (s *PostgresStore) CreateUserCart(ctx context.Context, cart *models.Cart) error {
-	_, err := s.pool.Exec(ctx,
-		"INSERT INTO carts (user_id, item_id, quantity) VALUES ($1, $2, $3)", cart.UserID, cart.ItemID, cart.Quantity)
+	_, err := s.DB().CreateUserCart(ctx, cart.UserID, cart.ItemID, cart.Quantity)
 	if err != nil {
 		return fmt.Errorf("%w: failed to run query on CreateUserCart while INSERT", err)
 	}
@@ -282,13 +261,7 @@ func (s *PostgresStore) GetRefreshToken(ctx context.Context, token string) (int,
 	var userID int
 	var active bool
 
-	err := s.pool.QueryRow(
-		ctx,
-		`SELECT user_id, active
-		 FROM refresh_tokens
-		 WHERE token = $1`,
-		token,
-	).Scan(&userID, &active)
+	err := s.DB().GetRefreshToken(ctx, token).Scan(&userID, &active)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -302,14 +275,7 @@ func (s *PostgresStore) GetRefreshToken(ctx context.Context, token string) (int,
 
 func (s *PostgresStore) SaveRefreshToken(ctx context.Context, userID int, token string) error {
 
-	_, err := s.pool.Exec(
-		ctx,
-		`INSERT INTO refresh_tokens
-		(token, user_id, active)
-		VALUES ($1, $2, TRUE)`,
-		token,
-		userID,
-	)
+	_, err := s.DB().SaveRefreshToken(ctx, userID, token)
 
 	if err != nil {
 		return fmt.Errorf("failed to save refresh token: %w", err)
@@ -320,13 +286,7 @@ func (s *PostgresStore) SaveRefreshToken(ctx context.Context, userID int, token 
 
 func (s *PostgresStore) DeactivateRefreshToken(ctx context.Context, token string) error {
 
-	_, err := s.pool.Exec(
-		ctx,
-		`UPDATE refresh_tokens
-		 SET active = FALSE
-		 WHERE token = $1`,
-		token,
-	)
+	_, err := s.DB().DeactivateRefreshToken(ctx, token)
 
 	if err != nil {
 		return fmt.Errorf("failed to deactivate refresh token: %w", err)
@@ -338,13 +298,7 @@ func (s *PostgresStore) DeactivateRefreshToken(ctx context.Context, token string
 func (s *PostgresStore) GetItemQuantityByID(ctx context.Context, userID int, itemID int) (int, error) {
 	var quantity int
 
-	err := s.pool.QueryRow(
-		ctx,
-		`SELECT quantity
-		 FROM carts
-		 WHERE user_id = $1 AND item_id = $2`,
-		userID, itemID,
-	).Scan(&quantity)
+	err := s.DB().GetItemQuantityByID(ctx, userID, itemID).Scan(&quantity)
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -359,14 +313,7 @@ func (s *PostgresStore) GetItemQuantityByID(ctx context.Context, userID int, ite
 ///////////////////////
 
 func (s *PostgresStore) GetOrderByID(ctx context.Context, orderID int) ([]models.CartItem, error) {
-	rows, err := s.pool.Query(
-		ctx,
-		`select i.id, i.name, i.description, i.price, i.stock, i.created_at, oi.quantity
-		from order_items oi
-		inner join items i on i.id = oi.item_id
-		where oi.order_id = $1`,
-		orderID,
-	)
+	rows, err := s.DB().GetOrderByID(ctx, orderID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get order with ID %d: %w", orderID, err)
@@ -391,14 +338,7 @@ func (s *PostgresStore) GetOrderByID(ctx context.Context, orderID int) ([]models
 }
 
 func (s *PostgresStore) GetOrderLineItemByID(ctx context.Context, orderID int) ([]models.LineItem, error) {
-	rows, err := s.pool.Query(
-		ctx,
-		`select i.id, oi.quantity, i.price
-		from order_items oi
-		inner join items i on i.id = oi.item_id
-		where oi.order_id = $1`,
-		orderID,
-	)
+	rows, err := s.DB().GetOrderLineItemByID(ctx, orderID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get order with ID %d: %w", orderID, err)
@@ -426,13 +366,7 @@ func (s *PostgresStore) GetUserOrders(ctx context.Context, userID int) ([]models
 	var total int
 	var status string
 
-	rows, err := s.pool.Query(
-		ctx,
-		`SELECT id
-		FROM orders
-		WHERE user_id = $1`,
-		userID,
-	)
+	rows, err := s.DB().GetUserOrderIDs(ctx, userID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to find order IDs: %w", err)
@@ -457,13 +391,7 @@ func (s *PostgresStore) GetUserOrders(ctx context.Context, userID int) ([]models
 			return nil, fmt.Errorf("failed to scan order items: %w", err)
 		}
 
-		s.pool.QueryRow(
-			ctx,
-			`SELECT total, status
-			FROM orders
-			WHERE user_id = $1 AND id = $2`,
-			userID, orderID,
-		).Scan(&total, &status)
+		s.DB().GetOrderTotalStatus(ctx, userID, orderID).Scan(&total, &status)
 
 		var order = models.Order{
 			ID:     orderID,
@@ -488,19 +416,7 @@ func (s *PostgresStore) GetUserOrdersOffset(
 	var total int
 	var status string
 
-	rows, err := s.pool.Query(
-		ctx,
-		`
-		SELECT id
-		FROM orders
-		WHERE user_id = $1
-		ORDER BY id DESC
-		LIMIT $2 OFFSET $3
-		`,
-		userID,
-		limit,
-		offset,
-	)
+	rows, err := s.DB().GetUserOrdersOffset(ctx, userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -523,13 +439,7 @@ func (s *PostgresStore) GetUserOrdersOffset(
 			return nil, fmt.Errorf("failed to scan order items: %w", err)
 		}
 
-		s.pool.QueryRow(
-			ctx,
-			`SELECT total, status
-			FROM orders
-			WHERE user_id = $1 AND id = $2`,
-			userID, orderID,
-		).Scan(&total, &status)
+		s.DB().GetOrderTotalStatus(ctx, userID, orderID).Scan(&total, &status)
 
 		var order = models.Order{
 			ID:     orderID,
@@ -554,20 +464,7 @@ func (s *PostgresStore) GetUserOrdersCursor(
 	var total int
 	var status string
 
-	rows, err := s.pool.Query(
-		ctx,
-		`
-		SELECT id
-		FROM orders
-		WHERE user_id = $1
-		AND ($2::int IS NULL OR id < $2)
-		ORDER BY id DESC
-		LIMIT $3
-		`,
-		userID,
-		cursor,
-		limit,
-	)
+	rows, err := s.DB().GetUserOrdersCursor(ctx, userID, limit, cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -590,13 +487,7 @@ func (s *PostgresStore) GetUserOrdersCursor(
 			return nil, fmt.Errorf("failed to scan order items: %w", err)
 		}
 
-		s.pool.QueryRow(
-			ctx,
-			`SELECT total, status
-			FROM orders
-			WHERE user_id = $1 AND id = $2`,
-			userID, orderID,
-		).Scan(&total, &status)
+		s.DB().GetOrderTotalStatus(ctx, userID, orderID).Scan(&total, &status)
 
 		var order = models.Order{
 			ID:     orderID,
