@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"checkout-api/apierrors"
 	"context"
 	"net/http"
 	"os"
@@ -16,13 +17,23 @@ func JWTMiddleware(next http.Handler) http.Handler {
 
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			http.Error(w, "missing Authorization header", http.StatusUnauthorized)
+			apierrors.Write(
+				w,
+				http.StatusUnauthorized,
+				apierrors.CodeUnauthorized,
+				"missing Authorizartion header",
+			)
 			return
 		}
 
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			http.Error(w, "invalid Authorization header", http.StatusUnauthorized)
+			apierrors.Write(
+				w,
+				http.StatusUnauthorized,
+				apierrors.CodeUnauthorized,
+				"invalid Authorization header",
+			)
 			return
 		}
 
@@ -43,7 +54,12 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		})
 
 		if err != nil {
-			http.Error(w, "invalid token", http.StatusUnauthorized)
+			apierrors.Write(
+				w,
+				http.StatusUnauthorized,
+				apierrors.CodeUnauthorized,
+				"invalid token",
+			)
 			return
 		}
 
