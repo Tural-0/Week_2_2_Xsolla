@@ -9,6 +9,16 @@ import (
 	"strconv"
 )
 
+// CreateUserCart godoc
+// @Summary      Creates a cart for the user
+// @Description  Creates a cart for the user with the given data
+// @Tags         Cart
+// @Produce      json
+// @Param        X-User-ID  header  int     			true  "The user's ID"
+// @Param        reqBody  	body  	CreateCartRequest   true  "Requested body"
+// @Success      200  {object}  models.Cart
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Router       /user/carts [post]
 func (h *Handler) CreateUserCart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		apierrors.Write(
@@ -151,6 +161,17 @@ func (h *Handler) CreateUserCart(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, cart)
 }
 
+// UpsertCartItem godoc
+// @Summary      Updates the quantity of an item
+// @Description  Updates the quantity of the given item for the user
+// @Tags         Cart
+// @Produce      json
+// @Param        X-User-ID  header  int     true  "The user's ID"
+// @Param        item_id  	path  	int     true  "The item's ID"
+// @Param        quantity 	body  	int     true  "The item's quantity"
+// @Success      201
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Router       /user/cart/items/{item_id} [patch]
 func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {
 
 	userIDStr := r.Header.Get("X-User-ID")
@@ -275,6 +296,16 @@ func (h *Handler) UpsertCartItem(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusNoContent, nil)
 }
 
+// RemoveCartItem godoc
+// @Summary      Removes an item from the cart
+// @Description  Removes the item from the cart entirely
+// @Tags         Cart
+// @Produce      json
+// @Param        X-User-ID  header  int     			true  "The user's ID"
+// @Param		 item_id 	path	int					true  "The item's ID"
+// @Success      204
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Router       /user/cart/items/{item_id} [delete]
 func (h *Handler) RemoveCartItem(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
@@ -345,6 +376,15 @@ func (h *Handler) RemoveCartItem(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// GetUserCart   godoc
+// @Summary      Gets the user's cart
+// @Description  Gets the given user's cart info
+// @Tags         Cart
+// @Produce      json
+// @Param        X-User-ID  header  int true  "The user's ID"
+// @Success      200  {object}  CartResponse
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Router       /user/cart [get]
 func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
@@ -400,6 +440,16 @@ func (h *Handler) GetUserCart(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// DeleteUserCart godoc
+// @Summary      Removes the user's cart
+// @Description  Removes the user's cart entirely
+// @Tags         Cart
+// @Produce      json
+// @Param        X-User-ID  header  int     			true  "The user's ID"
+// @Success      204
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Failure      500  {object}  apierrors.ErrorDetail
+// @Router       /user/cart [delete]
 func (h *Handler) DeleteUserCart(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {

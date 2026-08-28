@@ -10,7 +10,17 @@ import (
 	"strconv"
 )
 
-// GetItems handles GET /items — returns all available items.
+// GetItems godoc
+// @Summary      Get all items
+// @Description  Get a paginated list of items
+// @Tags         Items
+// @Produce      json
+// @Param        limit  query  int     false  "Number of items to return"
+// @Param        offset query  int     false  "Number of items to skip"
+// @Param        cursor query  int     false  "Cursor for cursor-based pagination"
+// @Success      200  {object}  handlers.OffsetResponse[models.Item]
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Router       /items [get]
 func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.Query()
@@ -116,7 +126,15 @@ func (h *Handler) GetItems(w http.ResponseWriter, r *http.Request) {
 	// writeJSON(w, http.StatusOK, items)
 }
 
-// GetItemByID handles GET /items/{id} — returns a single i`tem.
+// GetItemByID godoc
+// @Summary      Get an item using its ID
+// @Description  Get the item related to the given ID
+// @Tags         Items
+// @Produce      json
+// @Param        item_id  path  int     true  "ID of the item"
+// @Success      200  {object}  models.Item
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Router       /items/{item_id} [get]
 func (h *Handler) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	itemIDStr := r.PathValue("item_id")
 	if itemIDStr == "" {
@@ -175,6 +193,16 @@ func (h *Handler) GetItemByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, item)
 }
 
+// GetItemQuantityByID godoc
+// @Summary      Gets the quantity of item
+// @Description  Gets the quantity of an item in the given user's cart
+// @Tags         Items
+// @Produce      json
+// @Param        X-User-ID  header  int     true  "The user's ID"
+// @Param        item_id  path  int     true  "The item's ID"
+// @Success      200  {object}  int
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Router       /itemQuantity/{item_id} [get]
 func (h *Handler) GetItemQuantityByID(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {

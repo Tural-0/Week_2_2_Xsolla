@@ -12,6 +12,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// LoginUser   	godoc
+// @Summary      Logins the user
+// @Description  Logins the user and gives tokens if correncly loginned
+// @Tags         Auth
+// @Produce      json
+// @Param		 reqBody	body	AuthRequest	true	"The login details"
+// @Success      200  {object}  AuthResponse
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Router       /login [post]
 func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	var req AuthRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -131,6 +140,15 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// CreateUser   godoc
+// @Summary      Creates a user
+// @Description  Creates(signup) a user for later login use
+// @Tags         Auth
+// @Produce      json
+// @Param		 reqBody	body	AuthRequest	true	"The login details"
+// @Success      201
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Router       /signup [post]
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req AuthRequest
 	err := json.NewDecoder(r.Body).Decode(&req)

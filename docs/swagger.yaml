@@ -1,0 +1,524 @@
+basePath: /
+definitions:
+  apierrors.ErrorDetail:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  handlers.AuthRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.AuthResponse:
+    properties:
+      jwt:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  handlers.CartItemResponse:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      price:
+        description: Price in cents
+        type: integer
+      quantity:
+        type: integer
+      stock:
+        type: integer
+    type: object
+  handlers.CartResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/handlers.CartItemResponse'
+        type: array
+      user_id:
+        type: integer
+    type: object
+  handlers.CreateCartRequest:
+    properties:
+      item_id:
+        type: integer
+      quantity:
+        type: integer
+    type: object
+  handlers.CreateOrderRequest:
+    properties:
+      line_items:
+        items:
+          $ref: '#/definitions/handlers.LineItemRequest'
+        type: array
+      total:
+        type: integer
+    type: object
+  handlers.LineItemRequest:
+    properties:
+      item_id:
+        type: integer
+      price:
+        type: integer
+      quantity:
+        type: integer
+    type: object
+  handlers.OffsetMeta:
+    properties:
+      limit:
+        type: integer
+      offset:
+        type: integer
+    type: object
+  handlers.OffsetResponse-models_Item:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.Item'
+        type: array
+      pagination:
+        $ref: '#/definitions/handlers.OffsetMeta'
+    type: object
+  handlers.OffsetResponse-models_Order:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.Order'
+        type: array
+      pagination:
+        $ref: '#/definitions/handlers.OffsetMeta'
+    type: object
+  handlers.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  models.Cart:
+    properties:
+      item_id:
+        type: integer
+      quantity:
+        type: integer
+      user_id:
+        type: integer
+    type: object
+  models.Item:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      price:
+        description: Price in cents
+        type: integer
+      stock:
+        type: integer
+    type: object
+  models.LineItem:
+    properties:
+      item_id:
+        type: integer
+      price:
+        description: Price at time of adding
+        type: integer
+      quantity:
+        type: integer
+    type: object
+  models.Order:
+    properties:
+      id:
+        type: integer
+      line_items:
+        items:
+          $ref: '#/definitions/models.LineItem'
+        type: array
+      status:
+        description: pending, paid, failed
+        type: string
+      total:
+        type: integer
+      user_id:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API for managing items, carts, orders, and authentication.
+  title: Checkout API
+  version: "1.0"
+paths:
+  /itemQuantity/{item_id}:
+    get:
+      description: Gets the quantity of an item in the given user's cart
+      parameters:
+      - description: The user's ID
+        in: header
+        name: X-User-ID
+        required: true
+        type: integer
+      - description: The item's ID
+        in: path
+        name: item_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: integer
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Gets the quantity of item
+      tags:
+      - Items
+  /items:
+    get:
+      description: Get a paginated list of items
+      parameters:
+      - description: Number of items to return
+        in: query
+        name: limit
+        type: integer
+      - description: Number of items to skip
+        in: query
+        name: offset
+        type: integer
+      - description: Cursor for cursor-based pagination
+        in: query
+        name: cursor
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.OffsetResponse-models_Item'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Get all items
+      tags:
+      - Items
+  /items/{item_id}:
+    get:
+      description: Get the item related to the given ID
+      parameters:
+      - description: ID of the item
+        in: path
+        name: item_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Item'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Get an item using its ID
+      tags:
+      - Items
+  /login:
+    post:
+      description: Logins the user and gives tokens if correncly loginned
+      parameters:
+      - description: The login details
+        in: body
+        name: reqBody
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AuthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Logins the user
+      tags:
+      - Auth
+  /orders:
+    post:
+      description: Places an order according to the request details
+      parameters:
+      - description: The user's ID
+        in: header
+        name: X-User-ID
+        required: true
+        type: integer
+      - description: The idem key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      - description: The order details
+        in: body
+        name: reqBody
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              format: int32
+              type: integer
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Places the order
+      tags:
+      - Order
+  /signup:
+    post:
+      description: Creates(signup) a user for later login use
+      parameters:
+      - description: The login details
+        in: body
+        name: reqBody
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AuthRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Creates a user
+      tags:
+      - Auth
+  /token:
+    get:
+      description: Logins the user and gives tokens if correncly loginned
+      parameters:
+      - description: The refresh token details
+        in: body
+        name: reqBody
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Logins the user
+      tags:
+      - Auth
+  /user/cart:
+    delete:
+      description: Removes the user's cart entirely
+      parameters:
+      - description: The user's ID
+        in: header
+        name: X-User-ID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Removes the user's cart
+      tags:
+      - Cart
+    get:
+      description: Gets the given user's cart info
+      parameters:
+      - description: The user's ID
+        in: header
+        name: X-User-ID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.CartResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Gets the user's cart
+      tags:
+      - Cart
+  /user/cart/items/{item_id}:
+    delete:
+      description: Removes the item from the cart entirely
+      parameters:
+      - description: The user's ID
+        in: header
+        name: X-User-ID
+        required: true
+        type: integer
+      - description: The item's ID
+        in: path
+        name: item_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Removes an item from the cart
+      tags:
+      - Cart
+    patch:
+      description: Updates the quantity of the given item for the user
+      parameters:
+      - description: The user's ID
+        in: header
+        name: X-User-ID
+        required: true
+        type: integer
+      - description: The item's ID
+        in: path
+        name: item_id
+        required: true
+        type: integer
+      - description: The item's quantity
+        in: body
+        name: quantity
+        required: true
+        schema:
+          type: integer
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Updates the quantity of an item
+      tags:
+      - Cart
+  /user/carts:
+    post:
+      description: Creates a cart for the user with the given data
+      parameters:
+      - description: The user's ID
+        in: header
+        name: X-User-ID
+        required: true
+        type: integer
+      - description: Requested body
+        in: body
+        name: reqBody
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateCartRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Cart'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Creates a cart for the user
+      tags:
+      - Cart
+  /user/orders:
+    get:
+      description: Gets the orders of the given user
+      parameters:
+      - description: The user's ID
+        in: header
+        name: X-User-ID
+        required: true
+        type: integer
+      - description: Number of items to return
+        in: query
+        name: limit
+        type: integer
+      - description: Number of items to skip
+        in: query
+        name: offset
+        type: integer
+      - description: Cursor for cursor-based pagination
+        in: query
+        name: cursor
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.OffsetResponse-models_Order'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apierrors.ErrorDetail'
+      summary: Gets the orders of the user
+      tags:
+      - Order
+swagger: "2.0"

@@ -35,6 +35,15 @@ func GenerateRefreshToken() (string, error) {
 	return hex.EncodeToString(bytes), nil // convert to hex
 }
 
+// IssueJWT   	godoc
+// @Summary      Logins the user
+// @Description  Logins the user and gives tokens if correncly loginned
+// @Tags         Auth
+// @Produce      json
+// @Param		 reqBody	body	RefreshRequest	true	"The refresh token details"
+// @Success      200  {object}  AuthResponse
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Router       /token [get]
 func (h *Handler) IssueJWT(w http.ResponseWriter, r *http.Request) {
 	// TODO: implement issueing of new JWT with refresh token
 	// check if refresh_token exists in the db and still active
@@ -120,9 +129,9 @@ func (h *Handler) IssueJWT(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"jwt":           jwtToken,
-		"refresh_token": newRefreshToken,
+	writeJSON(w, http.StatusOK, AuthResponse{
+		JWT:          jwtToken,
+		RefreshToken: newRefreshToken,
 	})
 
 }

@@ -11,6 +11,18 @@ import (
 	"time"
 )
 
+// CreateOrder   godoc
+// @Summary      Places the order
+// @Description  Places an order according to the request details
+// @Tags         Order
+// @Produce      json
+// @Param        X-User-ID  		header  int     			true  "The user's ID"
+// @Param        Idempotency-Key  	header  string     			true  "The idem key"
+// @Param		 reqBody			body	CreateOrderRequest	true  "The order details"
+// @Success      200  {array}  	byte
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Failure      402  {object}  apierrors.ErrorDetail
+// @Router       /orders [post]
 func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.Header.Get("X-User-ID")
 	if userIDStr == "" {
@@ -138,6 +150,18 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	w.Write(responseBody)
 }
 
+// GetUserOrders   godoc
+// @Summary      Gets the orders of the user
+// @Description  Gets the orders of the given user
+// @Tags         Order
+// @Produce      json
+// @Param        X-User-ID  	header 	int     true  "The user's ID"
+// @Param        limit  		query  	int     false  "Number of items to return"
+// @Param        offset 		query  	int     false  "Number of items to skip"
+// @Param        cursor 		query  	int     false  "Cursor for cursor-based pagination"
+// @Success      200  {object}  OffsetResponse[models.Order]
+// @Failure      400  {object}  apierrors.ErrorDetail
+// @Router       /user/orders [get]
 func (h *Handler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.Query()

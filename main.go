@@ -7,14 +7,21 @@ import (
 	"net/http"
 	"os"
 
+	_ "checkout-api/docs"
 	"checkout-api/handlers"
 	"checkout-api/store"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
+// @title           Checkout API
+// @version         1.0
+// @description     API for managing items, carts, orders, and authentication.
+// @host            localhost:8080
+// @BasePath        /
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
@@ -95,6 +102,13 @@ func main() {
 	mux.HandleFunc("POST /signup", h.CreateUser)
 	mux.HandleFunc("POST /login", h.LoginUser)
 	mux.HandleFunc("GET /token", h.IssueJWT)
+
+	mux.Handle(
+		"GET /swagger/",
+		httpSwagger.Handler(
+			httpSwagger.URL("http://localhost:8080/swagger/doc.json"),
+		),
+	)
 
 	fmt.Println("Server starting on :8080")
 	handler := c.Handler(mux)
