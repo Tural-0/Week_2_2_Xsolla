@@ -24,7 +24,7 @@ import (
 // @BasePath        /
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
+		//log.Fatal("Error loading .env file")
 	}
 
 	connString := os.Getenv("CON_STRING")
