@@ -4,7 +4,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      CON_STRING: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      CON_STRING: postgresql://user:userpass@postgres:5432/week2_2_xsolla
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
       postgres:
@@ -13,14 +13,14 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: userpass
+      POSTGRES_DB: week2_2_xsolla
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U user -d week2_2_xsolla"]
       interval: 5s
       timeout: 5s
       retries: 5
