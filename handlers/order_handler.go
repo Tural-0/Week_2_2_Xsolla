@@ -143,6 +143,10 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	if !paymentResult.Success {
 		status = "failed"
 	}
+	if paymentResult.Success && discDetails.Amount != 0 {
+		discAmount := strconv.Itoa(discDetails.Amount)
+		status = "paid (discount " + discAmount + "%)"
+	}
 
 	if err := h.store.UpdateOrderStatus(r.Context(), order.ID, status); err != nil {
 		apierrors.Write(

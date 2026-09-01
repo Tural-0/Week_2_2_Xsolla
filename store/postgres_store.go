@@ -162,6 +162,7 @@ func (s *PostgresStore) CreateOrder(ctx context.Context, userID int, items []mod
 	}
 
 	var orderID int
+	total = total - (total / 100 * discount)
 	if err := q.InsertOrderReturning(ctx, userID, total, status).Scan(&orderID); err != nil {
 		return nil, fmt.Errorf("failed to insert order: %w", err)
 	}
@@ -178,8 +179,6 @@ func (s *PostgresStore) CreateOrder(ctx context.Context, userID int, items []mod
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
-
-	total = total - (total / 100 * discount)
 
 	return &models.Order{
 		ID:     orderID,
