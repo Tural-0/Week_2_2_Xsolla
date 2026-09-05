@@ -68,12 +68,12 @@ func PasswordCheck(pass string) error {
 	return nil
 }
 
-func DiscountCheck(discount models.Discount) error {
+func DiscountCheck(discount models.Discount, now time.Time) error {
 	if discount.Code == "" {
 		return nil
 	}
 
-	if discount.Ends_at.Compare(time.Now()) == -1 {
+	if discount.Ends_at.Before(now) {
 		return ErrLateDiscount
 	}
 	return nil

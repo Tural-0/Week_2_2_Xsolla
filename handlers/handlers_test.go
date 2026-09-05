@@ -8,8 +8,10 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"checkout-api/models"
+	"checkout-api/validation"
 
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -95,6 +97,7 @@ func (s *testStore) CreateOrder(
 	items []models.LineItem,
 	total int,
 	status string,
+	discount int,
 ) (*models.Order, error) {
 	order := &models.Order{
 		ID:     s.nextOrderID,
@@ -108,6 +111,19 @@ func (s *testStore) CreateOrder(
 	s.nextOrderID++
 
 	return order, nil
+}
+
+func (s *testStore) GetDiscountDetails(_ context.Context, discountCode string) (models.Discount, error) {
+	switch discountCode {
+	case "XSOLLA10":
+		return models.Discount{Code: "XSOLLA10", Amount: 10}, nil
+	case "XSOLLA20":
+		return models.Discount{Code: "XSOLLA20", Amount: 20, Ends_at: time.Now().Add(-10 * time.Second)}, validation.ErrLateDiscount
+	case "XSOLLA30":
+		return models.Discount{Code: "XSOLLA30", Amount: 30}, nil
+	default:
+		return models.Discount{}, validation.ErrInvalidDiscount
+	}
 }
 
 func (s *testStore) UpdateOrderStatus(

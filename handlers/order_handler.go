@@ -101,7 +101,7 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	if err := validation.DiscountCheck(discDetails); err != nil {
+	if err := validation.DiscountCheck(discDetails, time.Now()); err != nil {
 		apierrors.Write(
 			w,
 			http.StatusUnprocessableEntity,
