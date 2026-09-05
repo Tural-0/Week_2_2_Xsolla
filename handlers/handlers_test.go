@@ -121,6 +121,8 @@ func (s *testStore) GetDiscountDetails(_ context.Context, discountCode string) (
 		return models.Discount{Code: "XSOLLA20", Amount: 20, Ends_at: time.Now().Add(-10 * time.Second)}, validation.ErrLateDiscount
 	case "XSOLLA30":
 		return models.Discount{Code: "XSOLLA30", Amount: 30}, nil
+	case "":
+		return models.Discount{Code: "", Amount: 0}, nil
 	default:
 		return models.Discount{}, validation.ErrInvalidDiscount
 	}
@@ -595,6 +597,60 @@ func TestRemoveCartItem(t *testing.T) {
 	}
 }
 
+func TestUpsertCartItemInvalidQuantity(t *testing.T) {
+	store := newTestStore()
+	handler := NewHandler(store)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/user/cart/items/1",
+		strings.NewReader(`{"quantity":0}`),
+	)
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-User-ID", "1")
+	req.SetPathValue("item_id", "1")
+
+	rec := httptest.NewRecorder()
+
+	handler.UpsertCartItem(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusUnprocessableEntity,
+			rec.Code,
+		)
+	}
+}
+
+func TestUpsertCartItemInsufficientStock(t *testing.T) {
+	store := newTestStore()
+	handler := NewHandler(store)
+
+	req := httptest.NewRequest(
+		http.MethodPatch,
+		"/user/cart/items/1",
+		strings.NewReader(`{"quantity":11}`),
+	)
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-User-ID", "1")
+	req.SetPathValue("item_id", "1")
+
+	rec := httptest.NewRecorder()
+
+	handler.UpsertCartItem(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf(
+			"expected status %d, got %d",
+			http.StatusUnprocessableEntity,
+			rec.Code,
+		)
+	}
+}
+
 func TestDeleteUserCart(t *testing.T) {
 	store := newTestStore()
 	handler := NewHandler(store)
@@ -637,6 +693,7 @@ func TestCreateOrder(t *testing.T) {
 	handler := NewHandler(store)
 
 	body := `{
+		"discount":"",
 		"line_items": [
 			{
 				"item_id": 1,
@@ -680,6 +737,7 @@ func TestCreateOrderIdempotency(t *testing.T) {
 	handler := NewHandler(store)
 
 	body := `{
+		"discount":"",
 		"line_items": [
 			{
 				"item_id": 1,
@@ -836,6 +894,58 @@ func TestCreateUser(t *testing.T) {
 	}
 }
 
+func TestCreateUserValidation(t *testing.T) {
+	tests := []struct {
+		name     string
+		body     string
+		wantCode int
+	}{
+		{
+			name: "invalid email",
+			body: `{
+				"email":"not-an-email",
+				"password":"password123456"
+			}`,
+			wantCode: http.StatusUnprocessableEntity,
+		},
+		{
+			name: "invalid password",
+			body: `{
+				"email":"test@example.com",
+				"password":"short"
+			}`,
+			wantCode: http.StatusUnprocessableEntity,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newTestStore()
+			handler := NewHandler(store)
+
+			req := httptest.NewRequest(
+				http.MethodPost,
+				"/signup",
+				strings.NewReader(tt.body),
+			)
+
+			req.Header.Set("Content-Type", "application/json")
+
+			rec := httptest.NewRecorder()
+
+			handler.CreateUser(rec, req)
+
+			if rec.Code != tt.wantCode {
+				t.Fatalf(
+					"expected status %d, got %d",
+					tt.wantCode,
+					rec.Code,
+				)
+			}
+		})
+	}
+}
+
 func TestLoginUser(t *testing.T) {
 	store := newTestStore()
 	handler := NewHandler(store)
@@ -887,6 +997,72 @@ func TestLoginUser(t *testing.T) {
 
 	if !strings.Contains(rec.Body.String(), "refresh_token") {
 		t.Errorf("expected response to contain refresh_token")
+	}
+}
+
+func TestLoginUserInvalidCredentials(t *testing.T) {
+	store := newTestStore()
+	handler := NewHandler(store)
+
+	password := "password123456"
+
+	hash, err := bcrypt.GenerateFromPassword(
+		[]byte(password),
+		bcrypt.DefaultCost,
+	)
+
+	if err != nil {
+		t.Fatalf("failed to create test password hash: %v", err)
+	}
+
+	store.users["test@example.com"] = models.User{
+		ID:    1,
+		Email: "test@example.com",
+		Hash:  hash,
+	}
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "unknown email",
+			body: `{
+				"email":"unknown@example.com",
+				"password":"password123456"
+			}`,
+		},
+		{
+			name: "wrong password",
+			body: `{
+				"email":"test@example.com",
+				"password":"wrongpassword123"
+			}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(
+				http.MethodPost,
+				"/login",
+				strings.NewReader(tt.body),
+			)
+
+			req.Header.Set("Content-Type", "application/json")
+
+			rec := httptest.NewRecorder()
+
+			handler.LoginUser(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf(
+					"expected status %d, got %d",
+					http.StatusUnauthorized,
+					rec.Code,
+				)
+			}
+		})
 	}
 }
 

@@ -61,8 +61,8 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			apierrors.Write(
 				w,
-				http.StatusNotFound,
-				apierrors.CodeNotFound,
+				http.StatusUnauthorized,
+				apierrors.CodeUnauthorized,
 				"Invalid Credentials",
 			)
 			return
