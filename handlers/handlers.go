@@ -3,12 +3,12 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"time"
 
 	"checkout-api/models"
+	"checkout-api/services"
 )
 
 // ItemStore defines the data operations the handler needs.
@@ -46,6 +46,7 @@ var SigningSecret string = os.Getenv("JWT_SECRET")
 // Handler holds dependencies for HTTP handlers.
 type Handler struct {
 	store            ItemStore
+	orderService     *services.OrderService
 	idempotencyCache map[string]*IdempotencyRecord
 }
 
@@ -53,6 +54,7 @@ type Handler struct {
 func NewHandler(s ItemStore) *Handler {
 	return &Handler{
 		store:            s,
+		orderService:     services.NewOrderService(s),
 		idempotencyCache: make(map[string]*IdempotencyRecord),
 	}
 }
@@ -61,20 +63,6 @@ type IdempotencyRecord struct {
 	Response   []byte
 	StatusCode int
 	Expiry     time.Time
-}
-
-// mockProcessPayment simulates a payment provider call.
-func mockProcessPayment(amount int) PaymentResult {
-	if amount > 0 && amount < 1000000 {
-		return PaymentResult{
-			Success:       true,
-			TransactionID: fmt.Sprintf("txn_%d", time.Now().UnixNano()),
-		}
-	}
-	return PaymentResult{
-		Success: false,
-		Error:   "Payment declined",
-	}
 }
 
 // writeJSON encodes v as JSON and writes it to the response.

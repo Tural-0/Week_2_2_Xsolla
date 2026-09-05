@@ -6,6 +6,7 @@ import (
 	"checkout-api/pagination"
 	"checkout-api/validation"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -80,84 +81,127 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := validation.NonEmptyCart(req.LineItems); err != nil {
-		apierrors.Write(
-			w,
-			http.StatusUnprocessableEntity,
-			apierrors.CodeBusinessRuleViolation,
-			err.Error(),
-		)
-		return
-	}
+	// ////////////////////////////////////
+	// if err := validation.NonEmptyCart(req.LineItems); err != nil {
+	// 	apierrors.Write(
+	// 		w,
+	// 		http.StatusUnprocessableEntity,
+	// 		apierrors.CodeBusinessRuleViolation,
+	// 		err.Error(),
+	// 	)
+	// 	return
+	// }
 
-	req.DiscountCode = validation.String(req.DiscountCode)
-	discDetails, err := h.store.GetDiscountDetails(r.Context(), req.DiscountCode)
-	if err != nil {
-		apierrors.Write(
-			w,
-			http.StatusUnprocessableEntity,
-			apierrors.CodeBusinessRuleViolation,
-			"Discount is invalid",
-		)
-		return
-	}
-	if err := validation.DiscountCheck(discDetails, time.Now()); err != nil {
-		apierrors.Write(
-			w,
-			http.StatusUnprocessableEntity,
-			apierrors.CodeBusinessRuleViolation,
-			err.Error(),
-		)
-		return
-	}
+	// req.DiscountCode = validation.String(req.DiscountCode)
+	// discDetails, err := h.store.GetDiscountDetails(r.Context(), req.DiscountCode)
+	// if err != nil {
+	// 	apierrors.Write(
+	// 		w,
+	// 		http.StatusUnprocessableEntity,
+	// 		apierrors.CodeBusinessRuleViolation,
+	// 		"Discount is invalid",
+	// 	)
+	// 	return
+	// }
+	// if err := validation.DiscountCheck(discDetails, time.Now()); err != nil {
+	// 	apierrors.Write(
+	// 		w,
+	// 		http.StatusUnprocessableEntity,
+	// 		apierrors.CodeBusinessRuleViolation,
+	// 		err.Error(),
+	// 	)
+	// 	return
+	// }
+
+	// items := make([]models.LineItem, 0, len(req.LineItems))
+	// var total = 0
+	// for _, i := range req.LineItems {
+	// 	items = append(items, models.LineItem{
+	// 		ItemID:   i.ItemID,
+	// 		Quantity: i.Quantity,
+	// 		Price:    i.Price,
+	// 	})
+	// 	total += i.Quantity * i.Price
+	// }
+
+	// if total != req.Total {
+	// 	req.Total = total
+	// }
+
+	// order, err := h.store.CreateOrder(r.Context(), userID, items, req.Total, "pending", discDetails.Amount)
+	// if err != nil {
+	// 	apierrors.Write(
+	// 		w,
+	// 		http.StatusInternalServerError,
+	// 		apierrors.CodeInternal,
+	// 		err.Error(),
+	// 	)
+	// 	return
+	// }
+
+	// paymentResult := services.MockProcessPayment(req.Total)
+
+	// status := "paid"
+	// if !paymentResult.Success {
+	// 	status = "failed"
+	// }
+	// if paymentResult.Success && discDetails.Amount != 0 {
+	// 	discAmount := strconv.Itoa(discDetails.Amount)
+	// 	status = "paid (discount " + discAmount + "%)"
+	// }
+
+	// if err := h.store.UpdateOrderStatus(r.Context(), order.ID, status); err != nil {
+	// 	apierrors.Write(
+	// 		w,
+	// 		http.StatusInternalServerError,
+	// 		apierrors.CodeInternal,
+	// 		err.Error(),
+	// 	)
+	// 	return
+	// }
+	// order.Status = status
+	// /////////////////////////////////////////
 
 	items := make([]models.LineItem, 0, len(req.LineItems))
-	var total = 0
-	for _, i := range req.LineItems {
+
+	for _, item := range req.LineItems {
 		items = append(items, models.LineItem{
-			ItemID:   i.ItemID,
-			Quantity: i.Quantity,
-			Price:    i.Price,
+			ItemID:   item.ItemID,
+			Quantity: item.Quantity,
+			Price:    item.Price,
 		})
-		total += i.Quantity * i.Price
 	}
 
-	if total != req.Total {
-		req.Total = total
-	}
+	order, paymentResult, err := h.orderService.PlaceOrder(
+		r.Context(),
+		userID,
+		items,
+		req.Total,
+		req.DiscountCode,
+	)
 
-	order, err := h.store.CreateOrder(r.Context(), userID, items, req.Total, "pending", discDetails.Amount)
 	if err != nil {
-		apierrors.Write(
-			w,
-			http.StatusInternalServerError,
-			apierrors.CodeInternal,
-			err.Error(),
-		)
+		switch {
+		case errors.Is(err, validation.ErrNoItemInCart),
+			errors.Is(err, validation.ErrLateDiscount):
+			apierrors.Write(
+				w,
+				http.StatusUnprocessableEntity,
+				apierrors.CodeBusinessRuleViolation,
+				err.Error(),
+			)
+
+		default:
+			apierrors.Write(
+				w,
+				http.StatusInternalServerError,
+				apierrors.CodeInternal,
+				err.Error(),
+			)
+		}
+
 		return
 	}
-
-	paymentResult := mockProcessPayment(req.Total)
-
-	status := "paid"
-	if !paymentResult.Success {
-		status = "failed"
-	}
-	if paymentResult.Success && discDetails.Amount != 0 {
-		discAmount := strconv.Itoa(discDetails.Amount)
-		status = "paid (discount " + discAmount + "%)"
-	}
-
-	if err := h.store.UpdateOrderStatus(r.Context(), order.ID, status); err != nil {
-		apierrors.Write(
-			w,
-			http.StatusInternalServerError,
-			apierrors.CodeInternal,
-			err.Error(),
-		)
-		return
-	}
-	order.Status = status
 
 	responseData := map[string]any{
 		"order":   order,

@@ -6,13 +6,6 @@ type ErrorMessageResponse struct {
 	Message string `json:"message"`
 }
 
-// PaymentResult represents a response from the payment provider.
-type PaymentResult struct {
-	Success       bool   `json:"success"`
-	TransactionID string `json:"transaction_id,omitempty"`
-	Error         string `json:"error,omitempty"`
-}
-
 type ItemResponse struct {
 	ID          int       `json:"id"`
 	Name        string    `json:"name"`
