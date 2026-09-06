@@ -1,0 +1,16 @@
+stages:
+  - test
+
+unit_tests:
+  stage: test
+  image: golang:1.24
+
+  script:
+    - go test -race -coverprofile=coverage.out ./validation ./services
+    - go tool cover -func=coverage.out
+    - |
+      coverage=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%", "", $3); print $3}')
+      echo "Coverage: ${coverage}%"
+      awk "BEGIN {exit !($coverage >= 60)}"
+
+  coverage: '/total:\s+\(statements\)\s+([0-9]+\.[0-9]+)%/'
