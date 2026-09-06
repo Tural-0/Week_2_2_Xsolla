@@ -3,7 +3,7 @@ stages:
 
 unit_tests:
   stage: test
-  image: golang:1.24
+  image: golang:1.25
 
   script:
     - go test -race -coverprofile=coverage.out ./validation ./services
