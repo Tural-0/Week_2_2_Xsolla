@@ -3,6 +3,7 @@ package handlers
 import (
 	"cmp"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -31,6 +32,8 @@ type testStore struct {
 
 	nextOrderID int
 	nextUserID  int
+
+	getUserOrdersErr error
 }
 
 func newTestStore() *testStore {
@@ -62,6 +65,10 @@ func newTestStore() *testStore {
 		nextUserID:  1,
 	}
 }
+
+var (
+	getUserOrdersErr error = errors.New("Error occured while getting user orders")
+)
 
 // --------------------------------------------------
 // Store methods
@@ -859,6 +866,77 @@ func TestGetUserOrders(t *testing.T) {
 			http.StatusOK,
 			rec.Code,
 		)
+	}
+}
+
+func TestGetUserOrders_StatusCodes(t *testing.T) {
+	storeError := errors.New("database connection details")
+
+	tests := []struct {
+		name       string
+		userID     string
+		query      string
+		storeError error
+		wantStatus int
+		wantLeak   bool
+	}{
+		{
+			name:       "success",
+			userID:     "1",
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "missing user id",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid pagination",
+			userID:     "1",
+			query:      "?limit=abc",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "store error",
+			userID:     "1",
+			query:      "?cursor=-1",
+			wantStatus: http.StatusBadRequest,
+			wantLeak:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newTestStore()
+			store.getUserOrdersErr = tt.storeError
+
+			h := NewHandler(store)
+
+			req := httptest.NewRequest(
+				http.MethodGet,
+				"/user/orders"+tt.query,
+				nil,
+			)
+
+			if tt.userID != "" {
+				req.Header.Set("X-User-ID", tt.userID)
+			}
+
+			rec := httptest.NewRecorder()
+
+			h.GetUserOrders(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf(
+					"expected status %d, got %d",
+					tt.wantStatus,
+					rec.Code,
+				)
+			}
+
+			if tt.wantLeak && strings.Contains(rec.Body.String(), storeError.Error()) {
+				t.Fatal("internal error was leaked in response")
+			}
+		})
 	}
 }
 
