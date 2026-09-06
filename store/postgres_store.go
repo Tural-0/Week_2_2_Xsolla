@@ -510,8 +510,7 @@ func (s *PostgresStore) GetDiscountDetails(ctx context.Context, discountCode str
 	err := s.DB().GetDiscountCode(ctx, discountCode).Scan(&disc.Code, &disc.Amount, &disc.Ends_at)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			fmt.Print("no rows")
-			return models.Discount{}, fmt.Errorf("this discount code is invalid")
+			return models.Discount{Amount: 0}, nil
 		}
 		fmt.Printf("err occured")
 		fmt.Print(err)
