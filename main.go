@@ -114,6 +114,11 @@ func main() {
 		),
 	)
 
+	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("v1"))
+	})
+
 	fmt.Println("Server starting on :8080")
 	handler := c.Handler(mux)
 	log.Fatal(http.ListenAndServe(":8080", handler))
