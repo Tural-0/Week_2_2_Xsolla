@@ -20,7 +20,10 @@ spec:
             - containerPort: 8080
           env:
             - name: CON_STRING
-              value: postgresql://user:userpass@postgres:5432/week2_2_xsolla
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: CON_STRING
             - name: JWT_SECRET
               value: "kubernetes-demo-secret"
 
