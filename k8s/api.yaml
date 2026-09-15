@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: checkout-api:v1
+          image: checkout-api:v4
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -33,6 +33,15 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
+          livenessProbe:
+           httpGet:
+             path: /health
+             port: 8080
+
+          readinessProbe:
+           httpGet:
+             path: /health
+             port: 8080
 
 ---
 
