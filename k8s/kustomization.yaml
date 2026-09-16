@@ -5,6 +5,7 @@ resources:
   - postgres.yaml
   - api.yaml
   - api-config.yaml
+  - ingress.yaml
 
 configMapGenerator:
   - name: postgres-migrations
