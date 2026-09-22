@@ -124,6 +124,8 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 
+	mux.HandleFunc("POST /payments/xsolla", h.CreateXsollaPayment)
+
 	fmt.Println("Server starting on :8080")
 	handler := c.Handler(mux)
 	log.Fatal(http.ListenAndServe(":8080", handler))
