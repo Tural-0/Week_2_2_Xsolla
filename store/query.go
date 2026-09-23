@@ -242,3 +242,55 @@ func (q *Query) GetDiscountCode(ctx context.Context, discount string) pgx.Row {
 		discount,
 	)
 }
+
+func (q *Query) InsertXsollaTransaction(
+	ctx context.Context,
+	transactionID string,
+	userID int,
+	sku string,
+	quantity int,
+) (pgconn.CommandTag, error) {
+	return q.DBTX.Exec(
+		ctx,
+		`INSERT INTO xsolla_transactions
+		(transaction_id, user_id, sku, quantity)
+		VALUES ($1, $2, $3, $4)`,
+		transactionID,
+		userID,
+		sku,
+		quantity,
+	)
+}
+
+func (q *Query) UpsertUserItem(
+	ctx context.Context,
+	userID int,
+	itemID int,
+	quantity int,
+) (pgconn.CommandTag, error) {
+	return q.DBTX.Exec(
+		ctx,
+		`INSERT INTO user_items (user_id, item_id, quantity)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, item_id)
+		DO UPDATE SET quantity = user_items.quantity + EXCLUDED.quantity`,
+		userID,
+		itemID,
+		quantity,
+	)
+}
+
+func (q *Query) GetUserItemQuantity(
+	ctx context.Context,
+	userID int,
+	itemID int,
+) pgx.Row {
+	return q.DBTX.QueryRow(
+		ctx,
+		`SELECT quantity
+		FROM user_items
+		WHERE user_id = $1 AND item_id = $2`,
+		userID,
+		itemID,
+	)
+}
