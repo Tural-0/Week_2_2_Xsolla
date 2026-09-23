@@ -39,6 +39,15 @@ type ItemStore interface {
 	GetRefreshToken(ctx context.Context, token string) (int, bool, error)
 	SaveRefreshToken(ctx context.Context, userID int, token string) error
 	DeactivateRefreshToken(ctx context.Context, token string) error
+
+	ProcessXsollaPayment(
+		ctx context.Context,
+		transactionID string,
+		userID int,
+		sku string,
+		itemID int,
+		quantity int,
+	) (bool, error)
 }
 
 var SigningSecret string = os.Getenv("JWT_SECRET")

@@ -254,7 +254,8 @@ func (q *Query) InsertXsollaTransaction(
 		ctx,
 		`INSERT INTO xsolla_transactions
 		(transaction_id, user_id, sku, quantity)
-		VALUES ($1, $2, $3, $4)`,
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (transaction_id) DO NOTHING`,
 		transactionID,
 		userID,
 		sku,

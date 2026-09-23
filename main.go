@@ -125,6 +125,7 @@ func main() {
 	})
 
 	mux.HandleFunc("POST /payments/xsolla", h.CreateXsollaPayment)
+	mux.HandleFunc("POST /webhook", h.XsollaWebhook)
 
 	fmt.Println("Server starting on :8080")
 	handler := c.Handler(mux)

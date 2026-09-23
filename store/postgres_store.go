@@ -520,3 +520,89 @@ func (s *PostgresStore) GetDiscountDetails(ctx context.Context, discountCode str
 	return disc, nil
 
 }
+
+func (s *PostgresStore) InsertXsollaTransaction(
+	ctx context.Context,
+	transactionID string,
+	userID int,
+	sku string,
+	quantity int,
+) (bool, error) {
+	tag, err := s.DB().InsertXsollaTransaction(
+		ctx,
+		transactionID,
+		userID,
+		sku,
+		quantity,
+	)
+
+	if err != nil {
+		return false, err
+	}
+
+	return tag.RowsAffected() == 1, nil
+}
+
+func (s *PostgresStore) UpsertUserItem(
+	ctx context.Context,
+	userID int,
+	itemID int,
+	quantity int,
+) error {
+	_, err := s.DB().UpsertUserItem(
+		ctx,
+		userID,
+		itemID,
+		quantity,
+	)
+
+	return err
+}
+
+func (s *PostgresStore) ProcessXsollaPayment(
+	ctx context.Context,
+	transactionID string,
+	userID int,
+	sku string,
+	itemID int,
+	quantity int,
+) (bool, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to begin Xsolla transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	q := s.WithTx(tx)
+
+	tag, err := q.InsertXsollaTransaction(
+		ctx,
+		transactionID,
+		userID,
+		sku,
+		quantity,
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to record Xsolla transaction: %w", err)
+	}
+
+	// Transaction was already processed.
+	if tag.RowsAffected() == 0 {
+		return false, nil
+	}
+
+	if _, err := q.UpsertUserItem(
+		ctx,
+		userID,
+		itemID,
+		quantity,
+	); err != nil {
+		return false, fmt.Errorf("failed to grant item: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, fmt.Errorf("failed to commit Xsolla transaction: %w", err)
+	}
+
+	return true, nil
+}
