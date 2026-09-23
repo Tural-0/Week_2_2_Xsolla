@@ -62,7 +62,8 @@ func (h *Handler) XsollaWebhook(w http.ResponseWriter, r *http.Request) {
 
 	case "payment":
 		if err := h.processXsollaPayment(r, webhook); err != nil {
-			http.Error(w, "payment processing failed", http.StatusInternalServerError)
+			//http.Error(w, "payment processing failed", http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
