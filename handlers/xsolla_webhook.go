@@ -13,27 +13,28 @@ import (
 )
 
 type XsollaWebhook struct {
-	NotificationType string                `json:"notification_type"`
-	Transaction      XsollaTransaction     `json:"transaction"`
-	User             XsollaWebhookUser     `json:"user"`
-	Purchase         XsollaWebhookPurchase `json:"purchase"`
-}
-
-type XsollaTransaction struct {
-	ID string `json:"id"`
+	NotificationType string              `json:"notification_type"`
+	User             XsollaWebhookUser   `json:"user"`
+	Items            []XsollaWebhookItem `json:"items"`
+	Billing          XsollaBilling       `json:"billing"`
 }
 
 type XsollaWebhookUser struct {
-	ID string `json:"id"`
-}
-
-type XsollaWebhookPurchase struct {
-	Items []XsollaWebhookItem `json:"items"`
+	ID         string `json:"id"`
+	ExternalID string `json:"external_id"`
 }
 
 type XsollaWebhookItem struct {
 	SKU      string `json:"sku"`
 	Quantity int    `json:"quantity"`
+}
+
+type XsollaBilling struct {
+	Transaction XsollaTransaction `json:"transaction"`
+}
+
+type XsollaTransaction struct {
+	ID string `json:"id"`
 }
 
 func (h *Handler) XsollaWebhook(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +61,7 @@ func (h *Handler) XsollaWebhook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 
-	case "payment":
+	case "order_paid":
 		if err := h.processXsollaPayment(r, webhook); err != nil {
 			//http.Error(w, "payment processing failed", http.StatusInternalServerError)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -77,21 +78,20 @@ func (h *Handler) XsollaWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func verifyXsollaWebhook(body []byte, authorization string) bool {
-	const prefix = "Basic "
+	const prefix = "Signature "
 
 	if len(authorization) <= len(prefix) ||
 		authorization[:len(prefix)] != prefix {
 		return false
 	}
 
-	apiKey := os.Getenv("XSOLLA_API_KEY")
+	secretKey := os.Getenv("XSOLLA_WEBHOOK")
 
 	hash := sha1.New()
 	hash.Write(body)
-	hash.Write([]byte(apiKey))
+	hash.Write([]byte(secretKey))
 
 	expected := hex.EncodeToString(hash.Sum(nil))
-
 	actual := authorization[len(prefix):]
 
 	return subtle.ConstantTimeCompare(
@@ -104,24 +104,26 @@ func (h *Handler) processXsollaPayment(
 	r *http.Request,
 	webhook XsollaWebhook,
 ) error {
-	if webhook.Transaction.ID == "" {
+	transactionID := webhook.Billing.Transaction.ID
+
+	if transactionID == "" {
 		return fmt.Errorf("missing transaction ID")
 	}
 
-	if webhook.User.ID == "" {
+	if webhook.User.ExternalID == "" {
 		return fmt.Errorf("missing user ID")
 	}
 
-	userID, err := strconv.Atoi(webhook.User.ID)
+	userID, err := strconv.Atoi(webhook.User.ExternalID)
 	if err != nil {
 		return fmt.Errorf("invalid user ID: %w", err)
 	}
 
-	if len(webhook.Purchase.Items) == 0 {
+	if len(webhook.Items) == 0 {
 		return fmt.Errorf("no purchased items")
 	}
 
-	for _, item := range webhook.Purchase.Items {
+	for _, item := range webhook.Items {
 		if item.SKU == "" || item.Quantity <= 0 {
 			return fmt.Errorf("invalid purchased item")
 		}
@@ -133,7 +135,7 @@ func (h *Handler) processXsollaPayment(
 
 		_, err = h.store.ProcessXsollaPayment(
 			r.Context(),
-			webhook.Transaction.ID,
+			transactionID,
 			userID,
 			item.SKU,
 			itemID,
