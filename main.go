@@ -15,6 +15,9 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rs/cors"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // @title           Checkout API
@@ -61,6 +64,25 @@ func main() {
 	postgresStore := store.NewPostgresStore(pool)
 	h := handlers.NewHandler(postgresStore)
 	mux := http.NewServeMux()
+
+	httpRequests := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "checkout_http_requests_total",
+			Help: "Total number of HTTP requests handled by the checkout API.",
+		},
+		[]string{"code", "method"},
+	)
+
+	httpRequestDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "checkout_http_request_duration_seconds",
+			Help:    "Duration of HTTP requests handled by the checkout API.",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"code", "method"},
+	)
+
+	prometheus.MustRegister(httpRequests, httpRequestDuration)
 
 	// cart
 	mux.HandleFunc("POST /user/carts", h.CreateUserCart)
@@ -127,7 +149,19 @@ func main() {
 	mux.HandleFunc("POST /payments/xsolla", h.CreateXsollaPayment)
 	mux.HandleFunc("POST /webhook", h.XsollaWebhook)
 
+	mux.Handle("GET /metrics", promhttp.Handler())
+
 	fmt.Println("Server starting on :8080")
-	handler := c.Handler(mux)
+
+	var handler http.Handler = promhttp.InstrumentHandlerDuration(
+		httpRequestDuration,
+		promhttp.InstrumentHandlerCounter(
+			httpRequests,
+			mux,
+		),
+	)
+
+	handler = c.Handler(handler)
+
 	log.Fatal(http.ListenAndServe(":8080", handler))
 }

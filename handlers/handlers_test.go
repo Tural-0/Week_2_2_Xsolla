@@ -374,6 +374,17 @@ func (s *testStore) GetUserOrdersOffset(_ context.Context, c int, a int, b int) 
 	return orders, nil
 }
 
+func (s *testStore) ProcessXsollaPayment(
+	_ context.Context,
+	_ string,
+	_ int,
+	_ string,
+	_ int,
+	_ int,
+) (bool, error) {
+	return false, nil
+}
+
 // --------------------------------------------------
 // Tests
 // --------------------------------------------------
